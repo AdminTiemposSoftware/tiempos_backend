@@ -21,6 +21,16 @@
 4) Start the API:
    uvicorn app.main:app --reload
 
+## Endpoints
+- GET /health
+- GET /sales
+- GET /tickets
+- GET /branch
+- GET /branch/{branch_id}
+- POST /branch
+- PUT /branch/{branch_id}
+- DELETE /branch/{branch_id}
+
 ## MSSQL connection string
 Example for ODBC Driver 17:
 DATABASE_URL=mssql+pyodbc://USER:PASSWORD@SERVER:1433/DBNAME?driver=ODBC+Driver+17+for+SQL+Server

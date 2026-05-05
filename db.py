@@ -17,15 +17,16 @@ def call_stored_proc(proc_name: str, params: Optional[Mapping[str, object]] = No
     conn = engine.raw_connection()
     cursor = None
     try:
+        # print(f"Calling stored procedure: {proc_name} with params: {params}")
         cursor = conn.cursor()
         if params:
             items = list(params.items())
             assignments = ", ".join(f"@{key}=?" for key, _ in items)
-            sql = f"{{CALL {proc_name} {assignments}}}"
+            sql = f"EXEC {proc_name} {assignments}"
             values = [value for _, value in items]
             cursor.execute(sql, values)
         else:
-            sql = f"{{CALL {proc_name}}}"
+            sql = f"EXEC {proc_name}"
             cursor.execute(sql)
 
         rows = cursor.fetchall() if cursor.description else []

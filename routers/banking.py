@@ -4,18 +4,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from config import settings
 from db import call_stored_proc
 
-router = APIRouter(prefix="/branch", tags=["branch"])
+router = APIRouter(prefix="/banking", tags=["banking"])
 
 
 def _get_proc(proc_name: str | None, detail: str) -> str:
-    # Resolve stored procedure name or fail fast with a config error.
     if not proc_name:
         raise HTTPException(status_code=500, detail=detail)
     return proc_name
 
 
 def _call_proc(proc_name: str, params: dict[str, object] | None = None) -> list[dict]:
-    # Centralize DB error handling for stored procedure calls.
     try:
         return call_stored_proc(proc_name, params)
     except ValueError as exc:
@@ -25,7 +23,6 @@ def _call_proc(proc_name: str, params: dict[str, object] | None = None) -> list[
 
 
 def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[str, object]:
-    # Allow body payloads or query params, but require at least one value.
     if payload is not None:
         if not payload:
             raise HTTPException(status_code=400, detail="Payload cannot be empty")
@@ -38,70 +35,60 @@ def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[st
 
 
 @router.get("")
-def list_branch(request: Request) -> dict:
-    # List branches using optional query params as filters.
-    # Example query: /branch?is_active=1
-    proc_name = _get_proc(settings.branch, "Branch stored procedure not configured")
+def list_banking(request: Request) -> dict:
+    proc_name = _get_proc(settings.banking, "Banking stored procedure not configured")
     params = dict(request.query_params)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
-@router.get("/{branch_id}")
-def get_branch(branch_id: str, request: Request) -> dict:
-    # Get a single branch by id (merged with optional query params).
-    # Example query: /branch/42
-    proc_name = _get_proc(settings.branch, "Branch stored procedure not configured")
+@router.get("/{banking_id}")
+def get_banking(banking_id: str, request: Request) -> dict:
+    proc_name = _get_proc(settings.banking, "Banking stored procedure not configured")
     params = dict(request.query_params)
-    params.setdefault("branch_id", branch_id)
+    params.setdefault("banking_id", banking_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
 @router.post("")
-def create_branch(request: Request, payload: dict[str, object] | None = Body(default=None)) -> dict:
-    # Create a branch from body or query params.
-    # Example JSON: {"name": "Sucursal Norte", "code": "SN01", "is_active": 1}
+def create_banking(request: Request, payload: dict[str, object] | None = Body(default=None)) -> dict:
     proc_name = _get_proc(
-        settings.branch_create,
-        "Branch create stored procedure not configured",
+        settings.banking_create,
+        "Banking create stored procedure not configured",
     )
     params = _get_payload(request, payload)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
-@router.put("/{branch_id}")
-def update_branch(
-    branch_id: str,
+@router.put("/{banking_id}")
+def update_banking(
+    banking_id: str,
     request: Request,
     payload: dict[str, object] | None = Body(default=None),
 ) -> dict:
-    # Update a branch by id using body or query params.
-    # Example JSON: {"name": "Sucursal Norte 2", "is_active": 0}
     proc_name = _get_proc(
-        settings.branch_update,
-        "Branch update stored procedure not configured",
+        settings.banking_update,
+        "Banking update stored procedure not configured",
     )
     params = _get_payload(request, payload)
-    params = {"branch_id": branch_id, **params}
+    params = {"banking_id": banking_id, **params}
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
-@router.delete("/{branch_id}")
-def delete_branch(
-    branch_id: str,
+@router.delete("/{banking_id}")
+def delete_banking(
+    banking_id: str,
     request: Request,
     payload: dict[str, object] | None = Body(default=None),
 ) -> dict:
-    # Delete a branch by id. Optional payload/query params can be used for flags.
-    # Example query: /branch/42?hard_delete=1
     proc_name = _get_proc(
-        settings.branch_delete,
-        "Branch delete stored procedure not configured",
+        settings.banking_delete,
+        "Banking delete stored procedure not configured",
     )
-    params: dict[str, object] = {"branch_id": branch_id}
+    params: dict[str, object] = {"banking_id": banking_id}
     if payload is not None:
         if not payload:
             raise HTTPException(status_code=400, detail="Payload cannot be empty")

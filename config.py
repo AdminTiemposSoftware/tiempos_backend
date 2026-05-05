@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,8 +7,26 @@ class Settings(BaseSettings):
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
+    sales: str | None = None
+    tickets: str | None = None
+    branch: str | None = None
+    branch_create: str | None = None
+    branch_update: str | None = None
+    branch_delete: str | None = None
+    banking: str | None = None
+    banking_create: str | None = None
+    banking_update: str | None = None
+    banking_delete: str | None = None
+    user: str | None = None
+    user_create: str | None = None
+    user_update: str | None = None
+    user_delete: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()
