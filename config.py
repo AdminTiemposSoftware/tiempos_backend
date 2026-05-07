@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     max_overflow: int = 10
     pool_timeout: int = 30
     sales: str | None = None
-    tickets: str | None = None
+    ticket: str | None = None
+    ticket_create: str | None = None
     branch: str | None = None
     branch_create: str | None = None
     branch_update: str | None = None
@@ -21,6 +22,8 @@ class Settings(BaseSettings):
     draw_schedule_create: str | None = None
     draw_schedule_update: str | None = None
     draw_schedule_delete: str | None = None
+    draw_schedule_branch: str | None = None
+    draw_schedule_branch_create: str | None = None
     draw_day: str | None = None
     draw_day_create: str | None = None
     draw_day_update: str | None = None

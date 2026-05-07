@@ -7,6 +7,7 @@ from db import call_stored_proc
 router = APIRouter(prefix="/draw", tags=["draw"])
 draw_schedule_router = APIRouter(prefix="/draw-schedule", tags=["draw_schedule"])
 draw_day_router = APIRouter(prefix="/draw-day", tags=["draw_day"])
+draw_schedule_branch_router = APIRouter(prefix="/draw-schedule-branch", tags=["draw_schedule_branch"])
 
 
 def _get_proc(proc_name: str | None, detail: str) -> str:
@@ -245,5 +246,18 @@ def delete_draw_day(
         params.update(payload)
     else:
         params.update(dict(request.query_params))
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+@draw_schedule_branch_router.post("")
+def assign_schedule_to_branch(
+    request: Request,
+    payload: dict[str, object] | None = Body(default=None),
+) -> dict:
+    proc_name = _get_proc(
+        settings.draw_schedule_branch_create,
+        "Draw schedule branch stored procedure not configured",
+    )
+    params = _get_payload(request, payload)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
