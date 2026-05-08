@@ -114,7 +114,6 @@ async def login(
 
     token = _create_token(user)
 
-    print(token)
     response.set_cookie(
         settings.auth_cookie_name,
         token,
