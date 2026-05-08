@@ -40,9 +40,10 @@ def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[st
 @router.get("")
 def list_branch(request: Request) -> dict:
     # List branches using optional query params as filters.
-    # Example query: /branch?is_active=1
+    # Example query: /branch
     proc_name = _get_proc(settings.branch, "Branch stored procedure not configured")
     params = dict(request.query_params)
+    params["banking_id"] = 1  # TODO : Temporary hardcoded filter for testing
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
@@ -51,7 +52,7 @@ def list_branch(request: Request) -> dict:
 def get_branch(branch_id: str, request: Request) -> dict:
     # Get a single branch by id (merged with optional query params).
     # Example query: /branch/42
-    proc_name = _get_proc(settings.branch, "Branch stored procedure not configured")
+    proc_name = _get_proc(settings.branch_by_id, "Branch stored procedure not configured")
     params = dict(request.query_params)
     params.setdefault("branch_id", branch_id)
     rows = _call_proc(proc_name, params)
@@ -108,5 +109,12 @@ def delete_branch(
         params.update(payload)
     else:
         params.update(dict(request.query_params))
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+@router.get("/list")
+def list_branch(request: Request) -> dict:
+    proc_name = _get_proc(settings.branch_list, "Branch list stored procedure not configured")
+    params = dict(request.query_params)
     rows = _call_proc(proc_name, params)
     return {"items": rows}

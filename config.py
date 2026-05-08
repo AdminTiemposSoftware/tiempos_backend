@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ticket: str | None = None
     ticket_create: str | None = None
     branch: str | None = None
+    branch_by_id: str | None = None
     branch_create: str | None = None
     branch_update: str | None = None
     branch_delete: str | None = None
@@ -36,6 +37,12 @@ class Settings(BaseSettings):
     user_create: str | None = None
     user_update: str | None = None
     user_delete: str | None = None
+    auth_user: str | None = None
+    auth_secret: str = ""
+    auth_token_ttl_seconds: int = 86400
+    auth_cookie_name: str = "session"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: str = "lax"
 
     model_config = SettingsConfigDict(
         env_file=".env",
