@@ -48,6 +48,25 @@ def list_branch(request: Request) -> dict:
     return {"items": rows}
 
 
+@router.get("/by-user/{user_id}")
+def get_branch_by_user(user_id: str, request: Request) -> dict:
+    # Resolve the branch assigned to a given user id.
+    # Example query: /branch/by-user/42
+    proc_name = _get_proc(settings.branch_by_user, "Branch by user stored procedure not configured")
+    params = dict(request.query_params)
+    params.setdefault("user_id", user_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
+@router.get("/list")
+def list_branch_all(request: Request) -> dict:
+    proc_name = _get_proc(settings.branch_list, "Branch list stored procedure not configured")
+    params = dict(request.query_params)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
 @router.get("/{branch_id}")
 def get_branch(branch_id: str, request: Request) -> dict:
     # Get a single branch by id (merged with optional query params).
@@ -109,12 +128,5 @@ def delete_branch(
         params.update(payload)
     else:
         params.update(dict(request.query_params))
-    rows = _call_proc(proc_name, params)
-    return {"items": rows}
-
-@router.get("/list")
-def list_branch(request: Request) -> dict:
-    proc_name = _get_proc(settings.branch_list, "Branch list stored procedure not configured")
-    params = dict(request.query_params)
     rows = _call_proc(proc_name, params)
     return {"items": rows}

@@ -154,6 +154,7 @@ async def me(request: Request) -> dict:
             "id": str(payload.get("sub", "")),
             "role": str(payload.get("role", "user")),
             "username": str(payload.get("username", "")),
+            "branch_id": payload.get("branch_id"),
         }
     }
 

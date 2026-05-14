@@ -78,8 +78,6 @@ def get_user(user_id: str, request: Request) -> dict:
 
 @router.post("")
 def create_user(request: Request, payload: dict[str, object] | None = Body(default=None)) -> dict:
-    # Create a user from body or query params.
-    # Example JSON: {"username": "admin", "password": "secret", "name": "Admin", "phone": "5551234", "role": "admin"}
     proc_name = _get_proc(
         settings.user_create,
         "User create stored procedure not configured",

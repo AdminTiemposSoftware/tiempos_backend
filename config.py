@@ -12,10 +12,12 @@ class Settings(BaseSettings):
     ticket_create: str | None = None
     branch: str | None = None
     branch_by_id: str | None = None
+    branch_by_user: str | None = None
     branch_create: str | None = None
     branch_update: str | None = None
     branch_delete: str | None = None
     draw: str | None = None
+    draw_by_branch: str | None = None
     draw_create: str | None = None
     draw_update: str | None = None
     draw_delete: str | None = None

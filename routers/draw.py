@@ -261,3 +261,14 @@ def assign_schedule_to_branch(
     params = _get_payload(request, payload)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.get("/by-branch/{branch_id}")
+def get_draw_by_branch(branch_id: str, request: Request) -> dict:
+    proc_name = _get_proc(
+        settings.draw_by_branch,
+        "Draw by branch stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("branch_id", branch_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
