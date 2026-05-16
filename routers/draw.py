@@ -272,3 +272,14 @@ def get_draw_by_branch(branch_id: str, request: Request) -> dict:
     params.setdefault("branch_id", branch_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.get("/by-banking/{banking_id}")
+def get_draw_by_banking(banking_id: str, request: Request) -> dict:
+    proc_name = _get_proc(
+        settings.draw_by_banking,
+        "Draw by banking stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}

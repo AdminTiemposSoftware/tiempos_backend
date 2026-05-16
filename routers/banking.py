@@ -97,3 +97,14 @@ def delete_banking(
         params.update(dict(request.query_params))
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.get("/by-user/{user_id}")
+def get_banking_by_user(user_id: str, request: Request) -> dict:
+    proc_name = _get_proc(
+        settings.banking_by_user,
+        "Banking by user stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("user_id", user_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}

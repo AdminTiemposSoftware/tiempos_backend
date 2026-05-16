@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     branch_delete: str | None = None
     draw: str | None = None
     draw_by_branch: str | None = None
+    draw_by_banking: str | None = None
     draw_create: str | None = None
     draw_update: str | None = None
     draw_delete: str | None = None
@@ -32,6 +33,7 @@ class Settings(BaseSettings):
     draw_day_update: str | None = None
     draw_day_delete: str | None = None
     banking: str | None = None
+    banking_by_user: str | None = None
     banking_create: str | None = None
     banking_update: str | None = None
     banking_delete: str | None = None
@@ -39,6 +41,7 @@ class Settings(BaseSettings):
     user_create: str | None = None
     user_update: str | None = None
     user_delete: str | None = None
+    number_by_draw_schedule: str | None = None
     auth_user: str | None = None
     auth_secret: str = ""
     auth_token_ttl_seconds: int = 86400

@@ -1,4 +1,6 @@
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from secrets import token_hex
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,6 +17,16 @@ def _to_decimal_str(value: object, field_name: str) -> str:
         return format(normalized, "f")
     except (InvalidOperation, TypeError):
         raise HTTPException(status_code=400, detail=f"{field_name} must be a decimal value")
+
+
+def _generate_serial(draw_schedule_id: object, branch_id: object) -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%y%m%d%H%M%S")
+    branch_part = str(branch_id or 0).zfill(3)[-3:]
+    schedule_part = str(draw_schedule_id or 0).zfill(3)[-3:]
+    serial = f"{timestamp}{branch_part}{schedule_part}"
+    if len(serial) > 30:
+        raise HTTPException(status_code=500, detail="Generated ticket serial exceeds database limit")
+    return serial
 
 
 @router.get("")
@@ -54,13 +66,22 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
             )
         )
 
+    # Calculate total amount from details
+    try:
+        total_amount = sum(Decimal(str(detail.get("amount", 0))) for detail in details)
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Each details.amount must be a valid decimal value")
+
+
+
+    printed_at = datetime.now(timezone.utc)
+
     params = {
         "draw_schedule_id": payload.get("draw_schedule_id"),
         "branch_id": payload.get("branch_id"),
-        "serial": payload.get("serial"),
-        "amount": _to_decimal_str(payload.get("amount"), "amount"),
-        "printed_at": payload.get("printed_at"),
-        "enabled": payload.get("enabled", 1),
+        "serial": _generate_serial(payload.get("draw_schedule_id"), payload.get("branch_id")),
+        "amount": _to_decimal_str(total_amount, "amount"),
+        "printed_at": printed_at.isoformat(),
     }
 
     rows = call_stored_proc_table_var(
