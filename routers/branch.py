@@ -130,3 +130,14 @@ def delete_branch(
         params.update(dict(request.query_params))
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.get("/by-draw-schedule/{draw_schedule_id}")
+def get_branch_by_draw_schedule(draw_schedule_id: str, request: Request) -> dict:
+    proc_name = _get_proc(
+        settings.branch_by_draw_schedule,
+        "Branch by draw schedule stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("draw_schedule_id", draw_schedule_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}

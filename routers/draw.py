@@ -102,17 +102,6 @@ def delete_draw(
     return {"items": rows}
 
 
-@draw_schedule_router.get("")
-def list_draw_schedule(request: Request) -> dict:
-    proc_name = _get_proc(
-        settings.draw_schedule,
-        "Draw schedule stored procedure not configured",
-    )
-    params = dict(request.query_params)
-    rows = _call_proc(proc_name, params)
-    return {"items": rows}
-
-
 @draw_schedule_router.get("/{draw_schedule_id}")
 def get_draw_schedule(draw_schedule_id: str, request: Request) -> dict:
     proc_name = _get_proc(
@@ -120,7 +109,7 @@ def get_draw_schedule(draw_schedule_id: str, request: Request) -> dict:
         "Draw schedule stored procedure not configured",
     )
     params = dict(request.query_params)
-    params.setdefault("draw_schedule_id", draw_schedule_id)
+    params.setdefault("draw_id", draw_schedule_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     branch: str | None = None
     branch_by_id: str | None = None
     branch_by_user: str | None = None
+    branch_by_draw_schedule: str | None = None
     branch_create: str | None = None
     branch_update: str | None = None
     branch_delete: str | None = None
