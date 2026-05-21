@@ -37,16 +37,21 @@ def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[st
     return params
 
 
-@router.get("")
-def list_branch(request: Request) -> dict:
-    # List branches using optional query params as filters.
-    # Example query: /branch
-    proc_name = _get_proc(settings.branch, "Branch stored procedure not configured")
+@router.get("/by-banking/{banking_id}")
+def list_branch(request: Request, banking_id: str) -> dict:
+    proc_name = _get_proc(settings.branch_by_banking, "Branch stored procedure not configured")
     params = dict(request.query_params)
-    params["banking_id"] = 1  # TODO : Temporary hardcoded filter for testing
+    params.setdefault("banking_id", banking_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
+@router.get("/names/by-banking/{banking_id}")
+def list_branch_names(request: Request, banking_id: str) -> dict:
+    proc_name = _get_proc(settings.branch_names_by_banking, "Branch names stored procedure not configured")
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
 
 @router.get("/by-user/{user_id}")
 def get_branch_by_user(user_id: str, request: Request) -> dict:

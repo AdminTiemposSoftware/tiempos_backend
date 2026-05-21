@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     ticket: str | None = None
     ticket_create: str | None = None
     branch: str | None = None
+    branch_by_banking: str | None = None
+    branch_names_by_banking: str | None = None
     branch_by_id: str | None = None
     branch_by_user: str | None = None
     branch_by_draw_schedule: str | None = None
