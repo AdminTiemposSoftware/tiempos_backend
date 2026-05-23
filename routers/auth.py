@@ -183,8 +183,8 @@ async def login_puesto(
     return await _login_with_cookie(
         response,
         payload,
-        settings.auth_cookie_name_puesto,
-        "/puesto",
+        settings.auth_cookie_name,
+        "/",
         role="branch",
     )
 
@@ -197,8 +197,8 @@ async def login_banca(
     return await _login_with_cookie(
         response,
         payload,
-        settings.auth_cookie_name_banca,
-        "/banca",
+        settings.auth_cookie_name,
+        "/",
         role="banking",
     )
 
@@ -219,6 +219,6 @@ async def me(request: Request) -> dict:
 @router.post("/logout")
 async def logout(response: Response) -> dict:
     response.delete_cookie(settings.auth_cookie_name, path="/")
-    response.delete_cookie(settings.auth_cookie_name_puesto, path="/puesto")
-    response.delete_cookie(settings.auth_cookie_name_banca, path="/banca")
+    # response.delete_cookie(settings.auth_cookie_name_puesto, path="/puesto")
+    # response.delete_cookie(settings.auth_cookie_name_banca, path="/banca")
     return {"ok": True}
