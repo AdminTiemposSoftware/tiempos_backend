@@ -38,3 +38,18 @@ def get_numbers_by_draw_schedule(draw_schedule_id: str, branch_id: str, request:
     params.setdefault("branch_id", branch_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.post("/prohibited")
+def create_prohibited(request: Request, payload: dict[str, object]) -> dict:
+    proc_name = _get_proc(settings.prohibited_create, "Prohibited create stored procedure not configured")
+    payload = _get_payload(request, payload)
+    _call_proc(proc_name, payload)
+    return {"items": []}
+
+@router.get("/prohibited/by-banking/{banking_id}")
+def get_prohibited_by_banking_id(banking_id: str, request: Request) -> dict:
+    proc_name = _get_proc(settings.prohibited_by_banking_id, "Prohibited by banking ID stored procedure not configured")
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}

@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
 from db import call_stored_proc
+from routers.auth import _require_auth
 
 router = APIRouter(prefix="/banking", tags=["banking"])
 
@@ -100,6 +101,7 @@ def delete_banking(
 
 @router.get("/by-user/{user_id}")
 def get_banking_by_user(user_id: str, request: Request) -> dict:
+    _require_auth(request)
     proc_name = _get_proc(
         settings.banking_by_user,
         "Banking by user stored procedure not configured",

@@ -83,10 +83,57 @@ def _verify_token(token: str) -> dict[str, Any] | None:
     return payload
 
 
-@router.post("/login")
-async def login(
+def _resolve_cookie_name(app: str | None) -> str:
+    normalized = (app or "").strip().lower()
+    if normalized == "puesto":
+        return settings.auth_cookie_name_puesto
+    if normalized == "banca":
+        return settings.auth_cookie_name_banca
+    return settings.auth_cookie_name
+
+
+def _get_auth_token(request: Request) -> str:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+    app_header = request.headers.get("X-Auth-App")
+    cookie_name = _resolve_cookie_name(app_header)
+    token = request.cookies.get(cookie_name, "")
+    if token:
+        return token
+    for name in (settings.auth_cookie_name_puesto, settings.auth_cookie_name_banca, settings.auth_cookie_name):
+        token = request.cookies.get(name, "")
+        if token:
+            return token
+    return ""
+
+def _require_auth(request: Request) -> dict[str, Any]:
+    token = _get_auth_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    payload = _verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return payload
+
+
+def _set_auth_cookie(response: Response, token: str, cookie_name: str, cookie_path: str) -> None:
+    response.set_cookie(
+        cookie_name,
+        token,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
+        path=cookie_path,
+    )
+
+
+async def _login_with_cookie(
     response: Response,
-    payload: dict[str, object] = Body(...),
+    payload: dict[str, object],
+    cookie_name: str,
+    cookie_path: str,
+    role: str | None = None,
 ) -> dict:
     username = str(payload.get("username") or "").strip()
     password = str(payload.get("password") or "")
@@ -95,7 +142,10 @@ async def login(
         raise HTTPException(status_code=400, detail="Username and password are required")
 
     proc_name = _get_proc(settings.auth_user, "Auth stored procedure not configured")
-    rows = _call_proc(proc_name, {"username": username})
+    if role == "branch":
+        rows = _call_proc(proc_name, {"username": username, "role": "branch"})
+    elif role == "banking":
+        rows = _call_proc(proc_name, {"username": username, "role": "banking"})
     if not rows:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -113,15 +163,7 @@ async def login(
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = _create_token(user)
-
-    response.set_cookie(
-        settings.auth_cookie_name,
-        token,
-        httponly=True,
-        secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
-        path="/",
-    )
+    _set_auth_cookie(response, token, cookie_name, cookie_path)
 
     return {
         "token": token,
@@ -133,22 +175,37 @@ async def login(
     }
 
 
+@router.post("/puesto/login")
+async def login_puesto(
+    response: Response,
+    payload: dict[str, object] = Body(...),
+) -> dict:
+    return await _login_with_cookie(
+        response,
+        payload,
+        settings.auth_cookie_name_puesto,
+        "/puesto",
+        role="branch",
+    )
+
+
+@router.post("/banca/login")
+async def login_banca(
+    response: Response,
+    payload: dict[str, object] = Body(...),
+) -> dict:
+    return await _login_with_cookie(
+        response,
+        payload,
+        settings.auth_cookie_name_banca,
+        "/banca",
+        role="banking",
+    )
+
+
 @router.get("/me")
 async def me(request: Request) -> dict:
-    auth_header = request.headers.get("Authorization", "")
-    token = ""
-    if auth_header.lower().startswith("bearer "):
-        token = auth_header[7:].strip()
-    if not token:
-        token = request.cookies.get(settings.auth_cookie_name, "")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    payload = _verify_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
+    payload = _require_auth(request)
     return {
         "user": {
             "id": str(payload.get("sub", "")),
@@ -162,4 +219,6 @@ async def me(request: Request) -> dict:
 @router.post("/logout")
 async def logout(response: Response) -> dict:
     response.delete_cookie(settings.auth_cookie_name, path="/")
+    response.delete_cookie(settings.auth_cookie_name_puesto, path="/puesto")
+    response.delete_cookie(settings.auth_cookie_name_banca, path="/banca")
     return {"ok": True}
