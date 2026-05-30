@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from secrets import token_hex
+from routers.auth import _require_auth
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
-from db import call_stored_proc, call_stored_proc_table_var
+from db import call_stored_proc, call_stored_proc_multi, call_stored_proc_table_var
 
 router = APIRouter(prefix="/ticket", tags=["ticket"])
 
@@ -21,13 +21,12 @@ def _to_decimal_str(value: object, field_name: str) -> str:
 
 def _generate_serial(draw_schedule_id: object, branch_id: object) -> str:
     timestamp = datetime.now(timezone.utc).strftime("%y%m%d%H%M%S")
-    branch_part = str(branch_id or 0).zfill(3)[-3:]
-    schedule_part = str(draw_schedule_id or 0).zfill(3)[-3:]
+    branch_part = str(branch_id or 0).zfill(2)[-2:]
+    schedule_part = str(draw_schedule_id or 0).zfill(2)[-2:]
     serial = f"{timestamp}{branch_part}{schedule_part}"
     if len(serial) > 30:
         raise HTTPException(status_code=500, detail="Generated ticket serial exceeds database limit")
     return serial
-
 
 @router.get("")
 def list_tickets(request: Request) -> dict:
@@ -47,6 +46,7 @@ def list_tickets(request: Request) -> dict:
 
 @router.post("")
 def create_ticket(request: Request, payload: dict[str, object]) -> dict:
+    _require_auth(request)
     proc_name = settings.ticket_create
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets create stored procedure not configured")
@@ -93,3 +93,24 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
         table_rows=detail_rows,
     )
     return {"items": rows}
+
+@router.get("/by-schedule/{draw_schedule_id}/{branch_id}/{date}")
+def get_tickets_by_schedule(request: Request, draw_schedule_id: int, branch_id: int, date: date) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_by_schedule
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Tickets by schedule stored procedure not configured")
+
+    try:
+        result_sets = call_stored_proc_multi(
+            proc_name,
+            {"schedule_id": draw_schedule_id, "branch_id": branch_id, "date": date},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    items = result_sets[0] if len(result_sets) > 0 else []
+    details = result_sets[1] if len(result_sets) > 1 else []
+    return {"items": items, "details": details}

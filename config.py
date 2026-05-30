@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     max_overflow: int = 10
     pool_timeout: int = 30
     sales: str | None = None
-    ticket: str | None = None
     ticket_create: str | None = None
+    ticket_by_schedule: str | None = None
     branch: str | None = None
     branch_by_banking: str | None = None
     branch_names_by_banking: str | None = None
@@ -42,8 +42,6 @@ class Settings(BaseSettings):
     banking_delete: str | None = None
     user: str | None = None
     user_create: str | None = None
-    user_update: str | None = None
-    user_delete: str | None = None
     prohibited_create: str | None = None
     prohibited_by_banking_id: str | None = None
     number_by_draw_schedule: str | None = None

@@ -62,6 +62,50 @@ def call_stored_proc(proc_name: str, params: Optional[Mapping[str, object]] = No
     return [dict(zip(columns, row)) for row in rows]
 
 
+def call_stored_proc_multi(
+    proc_name: str, params: Optional[Mapping[str, object]] = None
+) -> list[list[dict]]:
+    conn = engine.raw_connection()
+    cursor = None
+    try:
+        _validate_identifier(proc_name, "proc_name", allow_qualified=True)
+        cursor = conn.cursor()
+        if params:
+            items = list(params.items())
+            for key, _ in items:
+                _validate_identifier(key, "param name")
+            assignments = ", ".join(f"@{key}=?" for key, _ in items)
+            sql = f"EXEC {proc_name} {assignments}"
+            values = [value for _, value in items]
+            cursor.execute(sql, values)
+        else:
+            sql = f"EXEC {proc_name}"
+            cursor.execute(sql)
+
+        result_sets: list[list[dict]] = []
+        while True:
+            if cursor.description:
+                columns = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                result_sets.append([dict(zip(columns, row)) for row in rows])
+            else:
+                result_sets.append([])
+
+            if not cursor.nextset():
+                break
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        if cursor is not None:
+            cursor.close()
+        conn.close()
+
+    return result_sets
+
+
 def call_stored_proc_table_var(
     proc_name: str,
     params: Mapping[str, object],
@@ -102,6 +146,9 @@ def call_stored_proc_table_var(
         values = [value for row in table_rows for value in row] + [value for _, value in scalar_items]
 
         cursor.execute(sql, values)
+
+        while cursor.description is None and cursor.nextset():
+            pass
 
         rows = cursor.fetchall() if cursor.description else []
         columns = [col[0] for col in cursor.description] if cursor.description else []
