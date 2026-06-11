@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
 from db import call_stored_proc
+from routers.auth import _require_auth
 
 router = APIRouter(prefix="/branch", tags=["branch"])
 
@@ -45,14 +46,6 @@ def list_branch(request: Request, banking_id: str) -> dict:
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
-@router.get("/names/by-banking/{banking_id}")
-def list_branch_names(request: Request, banking_id: str) -> dict:
-    proc_name = _get_proc(settings.branch_names_by_banking, "Branch names stored procedure not configured")
-    params = dict(request.query_params)
-    params.setdefault("banking_id", banking_id)
-    rows = _call_proc(proc_name, params)
-    return {"items": rows}
-
 @router.get("/by-user/{user_id}")
 def get_branch_by_user(user_id: str, request: Request) -> dict:
     # Resolve the branch assigned to a given user id.
@@ -62,7 +55,6 @@ def get_branch_by_user(user_id: str, request: Request) -> dict:
     params.setdefault("user_id", user_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
-
 
 @router.get("/list")
 def list_branch_all(request: Request) -> dict:
@@ -87,6 +79,7 @@ def get_branch(branch_id: str, request: Request) -> dict:
 def create_branch(request: Request, payload: dict[str, object] | None = Body(default=None)) -> dict:
     # Create a branch from body or query params.
     # Example JSON: {"name": "Sucursal Norte", "code": "SN01", "is_active": 1}
+    _require_auth(request)
     proc_name = _get_proc(
         settings.branch_create,
         "Branch create stored procedure not configured",

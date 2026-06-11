@@ -1,10 +1,9 @@
 from typing import Mapping, Optional
+from sqlalchemy import create_engine, text
+from config import settings
+from apscheduler.schedulers.background import BackgroundScheduler
 
 import re
-
-from sqlalchemy import create_engine, text
-
-from config import settings
 
 engine = create_engine(
     settings.database_url,
@@ -163,7 +162,42 @@ def call_stored_proc_table_var(
 
     return [dict(zip(columns, row)) for row in rows]
 
+scheduler = BackgroundScheduler()
 
+def archive_due_number_totals():
+    conn = engine.raw_connection()
+    """Background task that runs every 2 minutes"""
+    try:
+        # call_stored_proc("dbo.sp_archive_due_number_totals")
+        cursor = conn.cursor()
+        sql = f"EXEC dbo.sp_run_due_tasks"
+        cursor.execute(sql)
+        print(f"Task executed successfully: {cursor.fetchall()[0][0]}")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Failed to execute a scheduled task {e}")
+    conn.close()
+
+def start_scheduler():
+    """Start the background scheduler on app startup"""
+    if not scheduler.running:
+        scheduler.add_job(
+            archive_due_number_totals,
+            "interval",
+            minutes=2,
+            id="archive_due_numbers",
+            name="Archive due number totals",
+            replace_existing=True,
+        )
+        scheduler.start()
+        print("Background scheduler started")
+
+def stop_scheduler():
+    """Stop the scheduler on app shutdown"""
+    if scheduler.running:
+        scheduler.shutdown()
+        print("Background scheduler stopped")
 
 def ping() -> bool:
     with engine.connect() as conn:

@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
 from db import call_stored_proc
+from routers.auth import _require_auth
 
 router = APIRouter(prefix="/draw", tags=["draw"])
 draw_schedule_router = APIRouter(prefix="/draw-schedule", tags=["draw_schedule"])
@@ -243,6 +244,7 @@ def assign_schedule_to_branch(
     request: Request,
     payload: dict[str, object] | None = Body(default=None),
 ) -> dict:
+    _require_auth(request)
     proc_name = _get_proc(
         settings.draw_schedule_branch_create,
         "Draw schedule branch stored procedure not configured",
@@ -251,8 +253,25 @@ def assign_schedule_to_branch(
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
+@draw_schedule_branch_router.put("/{draw_schedule_id}")
+def update_schedule_branch(
+    draw_schedule_id: str,
+    request: Request,
+    payload: dict[str, object] | None = Body(default=None),
+) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.draw_schedule_branch_update,
+        "Draw schedule branch update stored procedure not configured",
+    )
+    params = _get_payload(request, payload)
+    params = {"draw_schedule_id": draw_schedule_id, **params}
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
 @router.get("/by-branch/{branch_id}")
 def get_draw_by_branch(branch_id: str, request: Request) -> dict:
+    _require_auth(request)
     proc_name = _get_proc(
         settings.draw_by_branch,
         "Draw by branch stored procedure not configured",

@@ -46,7 +46,6 @@ def list_tickets(request: Request) -> dict:
 
 @router.post("")
 def create_ticket(request: Request, payload: dict[str, object]) -> dict:
-    _require_auth(request)
     proc_name = settings.ticket_create
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets create stored procedure not configured")

@@ -10,31 +10,30 @@ class Settings(BaseSettings):
     sales: str | None = None
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None
-    branch: str | None = None
+
     branch_by_banking: str | None = None
-    branch_names_by_banking: str | None = None
     branch_by_id: str | None = None
     branch_by_user: str | None = None
     branch_by_draw_schedule: str | None = None
     branch_create: str | None = None
-    branch_update: str | None = None
-    branch_delete: str | None = None
+
     draw: str | None = None
     draw_by_branch: str | None = None
     draw_by_banking: str | None = None
     draw_create: str | None = None
     draw_update: str | None = None
     draw_delete: str | None = None
+
     draw_schedule: str | None = None
     draw_schedule_create: str | None = None
     draw_schedule_update: str | None = None
-    draw_schedule_delete: str | None = None
-    draw_schedule_branch: str | None = None
     draw_schedule_branch_create: str | None = None
+
     draw_day: str | None = None
     draw_day_create: str | None = None
     draw_day_update: str | None = None
     draw_day_delete: str | None = None
+
     banking: str | None = None
     banking_by_user: str | None = None
     banking_create: str | None = None

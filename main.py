@@ -1,10 +1,20 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
 from config import settings
 from routers import auth, banking, branch, draw, ticket
 from routers import health, sales, user, number
+from db import start_scheduler, stop_scheduler
 
-app = FastAPI(title=settings.app_name)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    start_scheduler()
+    yield
+    # Shutdown
+    stop_scheduler()
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.include_router(health.router)
 app.include_router(sales.router)
