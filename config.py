@@ -41,8 +41,11 @@ class Settings(BaseSettings):
     banking_delete: str | None = None
     user: str | None = None
     user_create: str | None = None
+
     prohibited_create: str | None = None
     prohibited_by_banking_id: str | None = None
+    prohibited_by_branch_id: str | None = None
+    
     number_by_draw_schedule: str | None = None
     auth_user: str | None = None
     auth_secret: str = ""
