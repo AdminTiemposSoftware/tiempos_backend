@@ -89,8 +89,6 @@ def _resolve_cookie_name(app: str | None) -> str:
         return settings.auth_cookie_name_puesto
     if normalized == "banca":
         return settings.auth_cookie_name_banca
-    return settings.auth_cookie_name
-
 
 def _get_auth_token(request: Request) -> str:
     auth_header = request.headers.get("Authorization", "")
@@ -101,7 +99,7 @@ def _get_auth_token(request: Request) -> str:
     token = request.cookies.get(cookie_name, "")
     if token:
         return token
-    for name in (settings.auth_cookie_name_puesto, settings.auth_cookie_name_banca, settings.auth_cookie_name):
+    for name in (settings.auth_cookie_name_puesto, settings.auth_cookie_name_banca):
         token = request.cookies.get(name, "")
         if token:
             return token
@@ -142,10 +140,10 @@ async def _login_with_cookie(
         raise HTTPException(status_code=400, detail="Username and password are required")
 
     proc_name = _get_proc(settings.auth_user, "Auth stored procedure not configured")
-    if role == "branch":
-        rows = _call_proc(proc_name, {"username": username, "role": "branch"})
-    elif role == "banking":
-        rows = _call_proc(proc_name, {"username": username, "role": "banking"})
+    rows = _call_proc(proc_name, {
+        "username": username, 
+        "role": role})
+
     if not rows:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -169,8 +167,8 @@ async def _login_with_cookie(
         "token": token,
         "user": {
             "id": str(user.get("id")),
-            "role": str(user.get("role", "user")),
-            "username": str(user.get("username", "")),
+            "role": str(user.get("role")),
+            "username": str(user.get("username")),
         },
     }
 
@@ -183,8 +181,8 @@ async def login_puesto(
     return await _login_with_cookie(
         response,
         payload,
-        settings.auth_cookie_name,
-        "/",
+        settings.auth_cookie_name_puesto,
+        "/puesto",
         role="branch",
     )
 
@@ -197,8 +195,8 @@ async def login_banca(
     return await _login_with_cookie(
         response,
         payload,
-        settings.auth_cookie_name,
-        "/",
+        settings.auth_cookie_name_banca,
+        "/banca",
         role="banking",
     )
 
@@ -212,13 +210,13 @@ async def me(request: Request) -> dict:
             "role": str(payload.get("role", "user")),
             "username": str(payload.get("username", "")),
             "branch_id": payload.get("branch_id"),
+            "banking_id": payload.get("banking_id"),
         }
     }
 
 
 @router.post("/logout")
 async def logout(response: Response) -> dict:
-    response.delete_cookie(settings.auth_cookie_name, path="/")
-    # response.delete_cookie(settings.auth_cookie_name_puesto, path="/puesto")
-    # response.delete_cookie(settings.auth_cookie_name_banca, path="/banca")
+    response.delete_cookie(settings.auth_cookie_name_puesto, path="/puesto")
+    response.delete_cookie(settings.auth_cookie_name_banca, path="/banca")
     return {"ok": True}

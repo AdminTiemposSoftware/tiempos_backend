@@ -8,6 +8,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from config import settings
 from db import call_stored_proc, call_stored_proc_multi, call_stored_proc_table_var
 
+from routers.auth import _require_auth
+
 router = APIRouter(prefix="/ticket", tags=["ticket"])
 
 
@@ -46,6 +48,7 @@ def list_tickets(request: Request) -> dict:
 
 @router.post("")
 def create_ticket(request: Request, payload: dict[str, object]) -> dict:
+    _require_auth(request)
     proc_name = settings.ticket_create
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets create stored procedure not configured")
@@ -70,8 +73,6 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
         total_amount = sum(Decimal(str(detail.get("amount", 0))) for detail in details)
     except (InvalidOperation, TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Each details.amount must be a valid decimal value")
-
-
 
     printed_at = datetime.now(timezone.utc)
 
