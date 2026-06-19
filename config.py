@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     user_create: str | None = None
 
     prohibited_create: str | None = None
+    prohibited_update: str | None = None
     prohibited_by_banking_id: str | None = None
     prohibited_by_branch_id: str | None = None
     
@@ -50,9 +51,10 @@ class Settings(BaseSettings):
     auth_user: str | None = None
     auth_secret: str = ""
     auth_token_ttl_seconds: int = 86400
-    auth_cookie_name: str = "session"
+
     auth_cookie_name_puesto: str = "session_puesto"
     auth_cookie_name_banca: str = "session_banca"
+    
     auth_cookie_secure: bool = False
     auth_cookie_samesite: str = "lax"
 
