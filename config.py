@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
+    
     sales: str | None = None
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None
@@ -33,12 +34,10 @@ class Settings(BaseSettings):
     draw_day_create: str | None = None
     draw_day_update: str | None = None
     draw_day_delete: str | None = None
-
-    banking: str | None = None
+    
     banking_by_user: str | None = None
     banking_create: str | None = None
-    banking_update: str | None = None
-    banking_delete: str | None = None
+
     user: str | None = None
     user_create: str | None = None
 
@@ -46,6 +45,8 @@ class Settings(BaseSettings):
     prohibited_update: str | None = None
     prohibited_by_banking_id: str | None = None
     prohibited_by_branch_id: str | None = None
+
+    report_today: str | None = None
     
     number_by_draw_schedule: str | None = None
     auth_user: str | None = None

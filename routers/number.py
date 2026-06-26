@@ -60,6 +60,7 @@ def update_prohibited(request: Request, id: str, payload: dict[str, object]) -> 
 
 @router.get("/prohibited/by-banking/{banking_id}")
 def get_prohibited_by_banking_id(banking_id: str, request: Request) -> dict:
+    _require_auth(request)
     proc_name = _get_proc(settings.prohibited_by_banking_id, "Prohibited by banking ID stored procedure not configured")
     params = dict(request.query_params)
     params.setdefault("banking_id", banking_id)
@@ -72,13 +73,5 @@ def get_prohibited_by_branch_id(branch_id: str, request: Request) -> dict:
     proc_name = _get_proc(settings.prohibited_by_branch_id, "Prohibited by branch ID stored procedure not configured")
     params = dict(request.query_params)
     params.setdefault("branch_id", branch_id)
-    rows = _call_proc(proc_name, params)
-    return {"items": rows}
-
-@router.get("/report")
-def get_report(request: Request) -> dict:
-    _require_auth(request)
-    proc_name = _get_proc(settings.number_report, "Number report stored procedure not configured")
-    params = dict(request.query_params)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
