@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from routers import auth, banking, branch, draw, ticket
-from routers import health, sales, user, number, report
+from routers import health, user, number, report
 from db import start_scheduler, stop_scheduler
 
 @asynccontextmanager
@@ -17,7 +17,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.include_router(health.router)
-app.include_router(sales.router)
 app.include_router(auth.router)
 app.include_router(ticket.router)
 app.include_router(draw.router)

@@ -139,3 +139,14 @@ def get_branch_by_draw_schedule(draw_schedule_id: str, request: Request) -> dict
     params.setdefault("draw_schedule_id", draw_schedule_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.get("/names/{banking_id}")
+def get_branch_names_by_banking(banking_id: str, request: Request) -> dict:
+    proc_name = _get_proc(
+        settings.branch_names,
+        "Branch names by banking stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}

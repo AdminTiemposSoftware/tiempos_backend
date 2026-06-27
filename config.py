@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ticket_by_schedule: str | None = None
 
     branch_by_banking: str | None = None
+    branch_names: str | None = None
     branch_by_id: str | None = None
     branch_by_user: str | None = None
     branch_by_draw_schedule: str | None = None
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
     draw_delete: str | None = None
 
     draw_schedule: str | None = None
+    draw_schedule_names: str | None = None
     draw_schedule_create: str | None = None
     draw_schedule_update: str | None = None
     draw_schedule_branch_create: str | None = None
@@ -47,6 +49,7 @@ class Settings(BaseSettings):
     prohibited_by_branch_id: str | None = None
 
     report_today: str | None = None
+    report_filtered: str | None = None
     
     number_by_draw_schedule: str | None = None
     auth_user: str | None = None
