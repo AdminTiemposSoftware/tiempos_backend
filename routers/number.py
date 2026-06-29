@@ -46,8 +46,8 @@ def create_prohibited(request: Request, payload: dict[str, object]) -> dict:
     _require_auth(request)
     proc_name = _get_proc(settings.prohibited_create, "Prohibited create stored procedure not configured")
     payload = _get_payload(request, payload)
-    _call_proc(proc_name, payload)
-    return {"items": []}
+    rows = _call_proc(proc_name, payload)
+    return {"items": rows}
 
 @router.put("/prohibited/{id}")
 def update_prohibited(request: Request, id: str, payload: dict[str, object]) -> dict:
@@ -75,3 +75,13 @@ def get_prohibited_by_branch_id(branch_id: str, request: Request) -> dict:
     params.setdefault("branch_id", branch_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.delete("/prohibited/{banking_id}/{number_id}")
+def delete_prohibited(request: Request, banking_id: str, number_id: str) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.prohibited_delete, "Prohibited delete stored procedure not configured")
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
+    params.setdefault("number_id", number_id)
+    _call_proc(proc_name, params)
+    return {"items": []}

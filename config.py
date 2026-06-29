@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     prohibited_create: str | None = None
     prohibited_update: str | None = None
+    prohibited_delete: str | None = None
     prohibited_by_banking_id: str | None = None
     prohibited_by_branch_id: str | None = None
 
