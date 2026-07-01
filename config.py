@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     max_overflow: int = 10
     pool_timeout: int = 30
     
-    sales: str | None = None
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None
 
@@ -51,15 +50,18 @@ class Settings(BaseSettings):
 
     report_today: str | None = None
     report_filtered: str | None = None
+
+    winner_by_banking_id: str | None = None
+    winner_create: str | None = None
     
     number_by_draw_schedule: str | None = None
+
     auth_user: str | None = None
     auth_secret: str = ""
     auth_token_ttl_seconds: int = 86400
 
     auth_cookie_name_puesto: str = "session_puesto"
     auth_cookie_name_banca: str = "session_banca"
-    
     auth_cookie_secure: bool = False
     auth_cookie_samesite: str = "lax"
 

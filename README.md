@@ -23,7 +23,6 @@
 
 ## Endpoints
 - GET /health
-- GET /sales
 - GET /tickets
 - GET /branch
 - GET /branch/{branch_id}
