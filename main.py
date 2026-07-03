@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
 from config import settings
-from routers import auth, banking, branch, draw, ticket, winner
+from routers import auth, banking, branch, draw, ticket, winner, position
 from routers import health, user, number, report
 from db import start_scheduler, stop_scheduler
 
@@ -29,3 +29,4 @@ app.include_router(user.router)
 app.include_router(number.router)
 app.include_router(report.router)
 app.include_router(winner.router)
+app.include_router(position.router)

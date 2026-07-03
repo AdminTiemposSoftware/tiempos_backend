@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     
     number_by_draw_schedule: str | None = None
 
+    position_create: str | None = None
+    position_update: str | None = None
+
     auth_user: str | None = None
     auth_secret: str = ""
     auth_token_ttl_seconds: int = 86400
