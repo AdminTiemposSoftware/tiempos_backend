@@ -114,3 +114,24 @@ def get_tickets_by_schedule(request: Request, draw_schedule_id: int, branch_id: 
     items = result_sets[0] if len(result_sets) > 0 else []
     details = result_sets[1] if len(result_sets) > 1 else []
     return {"items": items, "details": details}
+
+@router.get("/by-winner/{winner_id}")
+def get_tickets_by_winner(request: Request, winner_id: int) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_by_winner
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Tickets by winner stored procedure not configured")
+
+    try:
+        result_sets = call_stored_proc_multi(
+            proc_name,
+            {"winner_id": winner_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    items = result_sets[0] if len(result_sets) > 0 else []
+    details = result_sets[1] if len(result_sets) > 1 else []
+    return {"items": items, "details": details}
