@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     draw_schedule_names: str | None = None
     draw_schedule_create: str | None = None
     draw_schedule_update: str | None = None
+    draw_schedule_delete: str | None = None
     draw_schedule_branch_create: str | None = None
 
     draw_day: str | None = None
