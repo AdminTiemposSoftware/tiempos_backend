@@ -53,32 +53,33 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets create stored procedure not configured")
 
-    details = payload.get("details")
-    if not isinstance(details, list) or not details:
-        raise HTTPException(status_code=400, detail="details must be a non-empty list")
+    numbers = payload.get("numbers")
+    if not isinstance(numbers, list) or not numbers:
+        raise HTTPException(status_code=400, detail="numbers must be a non-empty list")
 
-    detail_rows = []
-    for detail in details:
-        detail_rows.append(
+    number_rows = []
+    for number in numbers:
+        number_rows.append(
             (
-                detail["number"],
-                _to_decimal_str(detail.get("amount"), "details.amount"),
-                detail["is_reventado"],
-                detail["is_megareventado"],
+                number["number"],
+                _to_decimal_str(number.get("amount"), "numbers.amount"),
+                number["is_reventado"],
+                number["is_megareventado"],
             )
         )
 
-    # Calculate total amount from details
+    # Calculate total amount from numbers
     try:
-        total_amount = sum(Decimal(str(detail.get("amount", 0))) for detail in details)
+        total_amount = sum(Decimal(str(number.get("amount", 0))) for number in numbers)
     except (InvalidOperation, TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="Each details.amount must be a valid decimal value")
+        raise HTTPException(status_code=400, detail="Each numbers.amount must be a valid decimal value")
 
     printed_at = datetime.now(timezone.utc)
 
     params = {
         "draw_schedule_id": payload.get("draw_schedule_id"),
         "branch_id": payload.get("branch_id"),
+        "details": payload.get("details"),
         "serial": _generate_serial(payload.get("draw_schedule_id"), payload.get("branch_id")),
         "amount": _to_decimal_str(total_amount, "amount"),
         "printed_at": printed_at.isoformat(),
@@ -87,10 +88,10 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
     rows = call_stored_proc_table_var(
         proc_name,
         params=params,
-        table_param="details",
+        table_param="numbers",
         table_type="dbo.ticket_detail_list",
         table_columns=["number", "amount", "is_reventado", "is_megareventado"],
-        table_rows=detail_rows,
+        table_rows=number_rows,
     )
     return {"items": rows}
 
@@ -112,8 +113,8 @@ def get_tickets_by_schedule(request: Request, draw_schedule_id: int, branch_id: 
         raise HTTPException(status_code=500, detail="Database error") from exc
 
     items = result_sets[0] if len(result_sets) > 0 else []
-    details = result_sets[1] if len(result_sets) > 1 else []
-    return {"items": items, "details": details}
+    numbers = result_sets[1] if len(result_sets) > 1 else []
+    return {"items": items, "numbers": numbers}
 
 @router.get("/by-winner/{winner_id}")
 def get_tickets_by_winner(request: Request, winner_id: int) -> dict:
@@ -133,5 +134,5 @@ def get_tickets_by_winner(request: Request, winner_id: int) -> dict:
         raise HTTPException(status_code=500, detail="Database error") from exc
 
     items = result_sets[0] if len(result_sets) > 0 else []
-    details = result_sets[1] if len(result_sets) > 1 else []
-    return {"items": items, "details": details}
+    numbers = result_sets[1] if len(result_sets) > 1 else []
+    return {"items": items, "numbers": numbers}
