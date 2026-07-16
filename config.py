@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     pool_size: int = 5
     max_overflow: int = 10
     pool_timeout: int = 30
+
+    HOUR_OFFSET: int = -6
     
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None

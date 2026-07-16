@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from routers.auth import _require_auth
 
@@ -74,7 +74,7 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
     except (InvalidOperation, TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Each numbers.amount must be a valid decimal value")
 
-    printed_at = datetime.now(timezone.utc)
+    printed_at = datetime.now() + timedelta(hours=settings.HOUR_OFFSET)
 
     params = {
         "draw_schedule_id": payload.get("draw_schedule_id"),
