@@ -1,3 +1,4 @@
+import numbers
 import secrets
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -147,3 +148,25 @@ def get_tickets_by_winner(request: Request, winner_id: int) -> dict:
     items = result_sets[0] if len(result_sets) > 0 else []
     numbers = result_sets[1] if len(result_sets) > 1 else []
     return {"items": items, "numbers": numbers}
+
+@router.get("/by-serial/{branch_id}/{serial}")
+def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_by_serial
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Tickets by serial stored procedure not configured")
+    
+    try:
+        results = call_stored_proc(
+            proc_name,
+            {"serial": serial, "branch_id": branch_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    if not results:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {"items": results}
+

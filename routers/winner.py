@@ -71,3 +71,40 @@ def create_winner(
     params = _get_payload(request, payload)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
+@router.post("/pay")
+def pay_winner(
+    request: Request,
+    payload: dict[str, object] | None = Body(default=None),
+) -> dict:
+    _require_auth(request)
+    
+    proc_name = _get_proc(
+        settings.winner_pay, 
+        "Winner payment stored procedure not configured"
+    )
+    params = _get_payload(request, payload)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+@router.get("/by-serial/{branch_id}/{serial}")
+def get_winner_by_serial(request: Request, branch_id: int, serial: str) -> dict:
+    _require_auth(request)
+    proc_name = settings.winner_by_serial
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Tickets by serial stored procedure not configured")
+    
+    try:
+        results = call_stored_proc(
+            proc_name,
+            {"serial": serial, "branch_id": branch_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    if not results:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {"items": results}
+

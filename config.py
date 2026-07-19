@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None
     ticket_by_winner: str | None = None
+    ticket_by_serial: str | None = None
 
     branch_by_banking: str | None = None
     branch_names: str | None = None
@@ -58,6 +59,8 @@ class Settings(BaseSettings):
     winner_by_banking_id: str | None = None
     winner_by_branch_id: str | None = None
     winner_create: str | None = None
+    winner_pay: str | None = None
+    winner_by_serial: str | None = None
     
     number_by_draw_schedule: str | None = None
 
