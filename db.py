@@ -60,7 +60,7 @@ def call_stored_proc(proc_name: str, params: Optional[Mapping[str, object]] = No
 
     return [dict(zip(columns, row)) for row in rows]
 
-
+# Execute a raw SQL query and return the results as a list of dictionaries.
 def call_stored_proc_multi(
     proc_name: str, params: Optional[Mapping[str, object]] = None
 ) -> list[list[dict]]:
@@ -104,7 +104,7 @@ def call_stored_proc_multi(
 
     return result_sets
 
-
+# Execute a stored procedure that takes a table-valued parameter and return the results as a list of dictionaries.
 def call_stored_proc_table_var(
     proc_name: str,
     params: Mapping[str, object],
@@ -164,7 +164,7 @@ def call_stored_proc_table_var(
 
 from collections.abc import Mapping
 
-
+# Execute a stored procedure that takes multiple table-valued parameters and return the results as a list of dictionaries.
 def call_stored_proc_table_vars(
     proc_name: str,
     params: Mapping[str, object],
