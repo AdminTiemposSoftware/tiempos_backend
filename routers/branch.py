@@ -46,6 +46,7 @@ def list_branch(request: Request, banking_id: str) -> dict:
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
+
 @router.get("/by-user/{user_id}")
 def get_branch_by_user(user_id: str, request: Request) -> dict:
     # Resolve the branch assigned to a given user id.
@@ -53,13 +54,6 @@ def get_branch_by_user(user_id: str, request: Request) -> dict:
     proc_name = _get_proc(settings.branch_by_user, "Branch by user stored procedure not configured")
     params = dict(request.query_params)
     params.setdefault("user_id", user_id)
-    rows = _call_proc(proc_name, params)
-    return {"items": rows}
-
-@router.get("/list")
-def list_branch_all(request: Request) -> dict:
-    proc_name = _get_proc(settings.branch_list, "Branch list stored procedure not configured")
-    params = dict(request.query_params)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
@@ -96,7 +90,7 @@ def update_branch(
     payload: dict[str, object] | None = Body(default=None),
 ) -> dict:
     # Update a branch by id using body or query params.
-    # Example JSON: {"name": "Sucursal Norte 2", "is_active": 0}
+    _require_auth(request)
     proc_name = _get_proc(
         settings.branch_update,
         "Branch update stored procedure not configured",
@@ -114,7 +108,7 @@ def delete_branch(
     payload: dict[str, object] | None = Body(default=None),
 ) -> dict:
     # Delete a branch by id. Optional payload/query params can be used for flags.
-    # Example query: /branch/42?hard_delete=1
+    _require_auth(request)
     proc_name = _get_proc(
         settings.branch_delete,
         "Branch delete stored procedure not configured",
@@ -129,6 +123,7 @@ def delete_branch(
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
+
 @router.get("/by-draw-schedule/{draw_schedule_id}")
 def get_branch_by_draw_schedule(draw_schedule_id: str, request: Request) -> dict:
     proc_name = _get_proc(
@@ -139,6 +134,7 @@ def get_branch_by_draw_schedule(draw_schedule_id: str, request: Request) -> dict
     params.setdefault("draw_schedule_id", draw_schedule_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
 
 @router.get("/names/{banking_id}")
 def get_branch_names_by_banking(banking_id: str, request: Request) -> dict:

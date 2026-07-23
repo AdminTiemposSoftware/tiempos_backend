@@ -15,12 +15,14 @@ class Settings(BaseSettings):
     ticket_by_winner: str | None = None
     ticket_by_serial: str | None = None
 
+    branch_create: str | None = None
+    branch_update: str | None = None
+    branch_delete: str | None = None
     branch_by_banking: str | None = None
     branch_names: str | None = None
     branch_by_id: str | None = None
     branch_by_user: str | None = None
     branch_by_draw_schedule: str | None = None
-    branch_create: str | None = None
 
     draw: str | None = None
     draw_by_branch: str | None = None
