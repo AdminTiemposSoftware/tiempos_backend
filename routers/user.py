@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
 from db import call_stored_proc
+from routers.auth import _require_auth
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -55,29 +56,19 @@ def _apply_password_hash(params: dict[str, object]) -> dict[str, object]:
     return params
 
 
-@router.get("")
-def list_user(request: Request) -> dict:
-    # List users using optional query params as filters.
-    # Example query: /user?enabled=1
-    proc_name = _get_proc(settings.user, "User stored procedure not configured")
+@router.get("/by-branch/{branch_id}")
+def get_user_by_branch(branch_id: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.user_by_branch, "User by branch stored procedure not configured")
     params = dict(request.query_params)
-    rows = _call_proc(proc_name, params)
-    return {"items": rows}
-
-
-@router.get("/{user_id}")
-def get_user(user_id: str, request: Request) -> dict:
-    # Get a single user by id (merged with optional query params).
-    # Example query: /user/42
-    proc_name = _get_proc(settings.user, "User stored procedure not configured")
-    params = dict(request.query_params)
-    params.setdefault("user_id", user_id)
+    params.setdefault("branch_id", branch_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
 @router.post("")
 def create_user(request: Request, payload: dict[str, object] | None = Body(default=None)) -> dict:
+    _require_auth(request)
     proc_name = _get_proc(
         settings.user_create,
         "User create stored procedure not configured",

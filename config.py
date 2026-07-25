@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     draw_delete: str | None = None
 
     draw_schedule: str | None = None
+    draw_schedule_by_branch: str | None = None
     draw_schedule_names: str | None = None
     draw_schedule_create: str | None = None
     draw_schedule_update: str | None = None
@@ -46,7 +47,7 @@ class Settings(BaseSettings):
     banking_by_user: str | None = None
     banking_create: str | None = None
 
-    user: str | None = None
+    user_by_branch: str | None = None
     user_create: str | None = None
 
     prohibited_create: str | None = None
