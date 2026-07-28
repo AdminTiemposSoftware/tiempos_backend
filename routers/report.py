@@ -39,7 +39,6 @@ def get_filtered_report(date_from: str, date_to: str, branches: str, draw_schedu
     }
     branches_list = [(int(x),) for x in branches.split(",")]
     draw_schedules_list = [(int(x),) for x in draw_schedules.split(",")]
-    print(f"branches={branches_list}, draw_schedules={draw_schedules_list}")
     table_params = [
         {
             "param": "branches",

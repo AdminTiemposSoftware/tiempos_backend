@@ -271,7 +271,6 @@ def archive_due_number_totals():
     conn = engine.raw_connection()
     """Background task that runs every 2 minutes"""
     try:
-        # call_stored_proc("dbo.sp_archive_due_number_totals")
         cursor = conn.cursor()
         sql = f"EXEC dbo.sp_run_due_tasks"
         cursor.execute(sql)
