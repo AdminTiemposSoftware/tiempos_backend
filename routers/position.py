@@ -39,7 +39,7 @@ def create_position(
 ) -> dict:
     _require_auth(request)
     proc_name = _get_proc(
-        settings.position_create, 
+        settings.position_create,
         "Position creation stored procedure not configured"
     )
     params = _get_payload(request, payload)
@@ -53,9 +53,22 @@ def update_position(
 ) -> dict:
     _require_auth(request)
     proc_name = _get_proc(
-        settings.position_update, 
+        settings.position_update,
         "Position update stored procedure not configured"
     )
     params = _get_payload(request, payload)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
+@router.get("/by-banking/{banking_id}")
+def get_positions(request: Request, banking_id: str) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.position_by_banking,
+        "Position get stored procedure not configured"
+    )
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}

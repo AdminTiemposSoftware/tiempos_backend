@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     pool_timeout: int = 30
 
     HOUR_OFFSET: int = -6
-    
+
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None
     ticket_by_winner: str | None = None
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     draw_day_create: str | None = None
     draw_day_update: str | None = None
     draw_day_delete: str | None = None
-    
+
     banking_by_user: str | None = None
     banking_create: str | None = None
 
@@ -59,14 +59,16 @@ class Settings(BaseSettings):
     report_today: str | None = None
     report_filtered: str | None = None
 
+    winner_by_banking_last_7_days: str | None = None
     winner_by_banking_id: str | None = None
     winner_by_branch_id: str | None = None
     winner_create: str | None = None
     winner_pay: str | None = None
     winner_by_serial: str | None = None
-    
+
     number_by_draw_schedule: str | None = None
 
+    position_by_banking: str | None = None
     position_create: str | None = None
     position_update: str | None = None
 
