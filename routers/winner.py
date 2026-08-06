@@ -36,7 +36,7 @@ def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[st
 def get_winner(banking_id: str, date: str, request: Request) -> dict:
     _require_auth(request)
     proc_name = _get_proc(
-        settings.winner_by_banking_id, 
+        settings.winner_by_banking_id,
         "Winner stored procedure not configured"
     )
     params = dict(request.query_params)
@@ -45,11 +45,26 @@ def get_winner(banking_id: str, date: str, request: Request) -> dict:
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
+
+@router.get("/by-banking-last-7-days/{banking_id}/{date}")
+def get_winner_by_banking_last_7_days(banking_id: str, date: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.winner_by_banking_last_7_days,
+        "Winner stored procedure not configured"
+    )
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
+    params.setdefault("date", date)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
 @router.get("/by-branch/{branch_id}/{date}")
 def get_winner(branch_id: str, date: str, request: Request) -> dict:
     _require_auth(request)
     proc_name = _get_proc(
-        settings.winner_by_branch_id, 
+        settings.winner_by_branch_id,
         "Winner stored procedure not configured"
     )
     params = dict(request.query_params)
@@ -65,7 +80,7 @@ def create_winner(
 ) -> dict:
     _require_auth(request)
     proc_name = _get_proc(
-        settings.winner_create, 
+        settings.winner_create,
         "Winner creation stored procedure not configured"
     )
     params = _get_payload(request, payload)
@@ -78,9 +93,9 @@ def pay_winner(
     payload: dict[str, object] | None = Body(default=None),
 ) -> dict:
     _require_auth(request)
-    
+
     proc_name = _get_proc(
-        settings.winner_pay, 
+        settings.winner_pay,
         "Winner payment stored procedure not configured"
     )
     params = _get_payload(request, payload)
@@ -93,7 +108,7 @@ def get_winner_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     proc_name = settings.winner_by_serial
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets by serial stored procedure not configured")
-    
+
     try:
         results = call_stored_proc(
             proc_name,
@@ -107,4 +122,3 @@ def get_winner_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     if not results:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return {"items": results}
-
