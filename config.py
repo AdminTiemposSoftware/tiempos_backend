@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     HOUR_OFFSET: int = -6
 
+    ticket_from_today_by_branch: str | None = None
     ticket_create: str | None = None
     ticket_by_schedule: str | None = None
     ticket_by_winner: str | None = None

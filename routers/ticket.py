@@ -75,12 +75,16 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
     except (InvalidOperation, TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Each numbers.amount must be a valid decimal value")
 
+    date = payload.get("date")
+    if not date:
+        raise HTTPException(status_code=400, detail="date is required")
     printed_at = datetime.now() + timedelta(hours=settings.HOUR_OFFSET)
 
     last_error: Exception | None = None
     # TODO : Implement a more robust mechanism for generating unique serials, possibly using a database sequence or UUIDs.
     for _ in range(10):
         params = {
+            "date": date,
             "draw_schedule_id": payload.get("draw_schedule_id"),
             "branch_id": payload.get("branch_id"),
             "details": payload.get("details"),
@@ -128,6 +132,29 @@ def get_tickets_by_schedule(request: Request, draw_schedule_id: int, branch_id: 
     numbers = result_sets[1] if len(result_sets) > 1 else []
     return {"items": items, "numbers": numbers}
 
+
+@router.get("/from-today/{branch_id}")
+def get_tickets_from_today_by_branch(request: Request, branch_id: int) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_from_today_by_branch
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Tickets from today by branch stored procedure not configured")
+
+    try:
+        result_sets = call_stored_proc_multi(
+            proc_name,
+            {"branch_id": branch_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    items = result_sets[0] if len(result_sets) > 0 else []
+    numbers = result_sets[1] if len(result_sets) > 1 else []
+    return {"items": items, "numbers": numbers}
+
+
 @router.get("/by-winner/{winner_id}")
 def get_tickets_by_winner(request: Request, winner_id: int) -> dict:
     _require_auth(request)
@@ -155,7 +182,7 @@ def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     proc_name = settings.ticket_by_serial
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets by serial stored procedure not configured")
-    
+
     try:
         results = call_stored_proc(
             proc_name,
@@ -169,4 +196,3 @@ def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     if not results:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return {"items": results}
-
