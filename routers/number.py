@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
-from db import call_stored_proc
+from db import call_stored_proc, call_stored_proc_table_vars
 from routers.auth import _require_auth
 
 router = APIRouter(prefix="/number", tags=["number"])
@@ -19,8 +19,8 @@ def _call_proc(proc_name: str, params: dict[str, object] | None = None) -> list[
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Database error") from exc
-    
-def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[str, object]: 
+
+def _get_payload(request: Request, payload: dict[str, object] | None) -> dict[str, object]:
     if payload is not None:
         if not payload:
             raise HTTPException(status_code=400, detail="Payload cannot be empty")
@@ -85,3 +85,24 @@ def delete_prohibited(request: Request, banking_id: str, number_id: str) -> dict
     params.setdefault("number_id", number_id)
     _call_proc(proc_name, params)
     return {"items": []}
+
+@router.get("/prohibited/filtered")
+def get_prohibited_filtered(date_from: str, date_to: str, banking_id: str, branches: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.prohibited_filtered, "Prohibited filtered stored procedure not configured")
+    params = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "banking_id": banking_id,
+    }
+    branches_list = [(int(x),) for x in branches.split(",")]
+    table_params = [
+        {
+            "param": "branches",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": branches_list
+        }
+    ]
+    rows = call_stored_proc_table_vars(proc_name, params, table_params)
+    return {"items": rows}

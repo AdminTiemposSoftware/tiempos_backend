@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     prohibited_delete: str | None = None
     prohibited_by_banking_id: str | None = None
     prohibited_by_branch_id: str | None = None
+    prohibited_filtered: str | None = None
 
     report_today: str | None = None
     report_filtered: str | None = None
