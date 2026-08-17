@@ -44,13 +44,13 @@ def create_draw(request: Request, payload: dict[str, object] | None = Body(defau
         settings.draw_create,
         "Draw create stored procedure not configured",
     )
-    params = { 
+    params = {
         "name": payload.get("name"),
         "is_reventado": payload.get("is_reventado"),
         "is_megareventado": payload.get("is_megareventado"),
         "banking_id": payload.get("banking_id")
     }
-    days = payload.get("draw_days") 
+    days = payload.get("draw_days")
     if not isinstance(days, list) or not days:
         raise HTTPException(status_code=400, detail="draw_days must be a non-empty list")
     draw_days = []
@@ -58,10 +58,10 @@ def create_draw(request: Request, payload: dict[str, object] | None = Body(defau
     for day in days:
         day_name = day.get("day_name") if isinstance(day, dict) else day
         draw_days.append((day_name,))
-        
+
     rows = call_stored_proc_table_var(
-        proc_name, 
-        params, 
+        proc_name,
+        params,
         "draw_days",
         "dbo.draw_day_list",
         ["day_name"],
@@ -77,13 +77,13 @@ def update_draw(draw_id: str, request: Request, payload: dict[str, object] | Non
         settings.draw_update,
         "Draw update stored procedure not configured",
     )
-    params = { 
+    params = {
         "id": draw_id,
         "name": payload.get("name"),
         "is_reventado": payload.get("is_reventado"),
         "is_megareventado": payload.get("is_megareventado")
     }
-    days = payload.get("draw_days") 
+    days = payload.get("draw_days")
     if not isinstance(days, list) or not days:
         raise HTTPException(status_code=400, detail="draw_days must be a non-empty list")
     draw_days = []
@@ -91,10 +91,10 @@ def update_draw(draw_id: str, request: Request, payload: dict[str, object] | Non
     for day in days:
         day_name = day.get("day_name") if isinstance(day, dict) else day
         draw_days.append((day_name,))
-        
+
     rows = call_stored_proc_table_var(
-        proc_name, 
-        params, 
+        proc_name,
+        params,
         "draw_days",
         "dbo.draw_day_list",
         ["day_name"],

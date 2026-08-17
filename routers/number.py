@@ -87,13 +87,12 @@ def delete_prohibited(request: Request, banking_id: str, number_id: str) -> dict
     return {"items": []}
 
 @router.get("/prohibited/filtered")
-def get_prohibited_filtered(date_from: str, date_to: str, banking_id: str, branches: str, request: Request) -> dict:
+def get_prohibited_filtered(date_from: str, date_to: str, branches: str, request: Request) -> dict:
     _require_auth(request)
     proc_name = _get_proc(settings.prohibited_filtered, "Prohibited filtered stored procedure not configured")
     params = {
         "date_from": date_from,
-        "date_to": date_to,
-        "banking_id": banking_id,
+        "date_to": date_to
     }
     branches_list = [(int(x),) for x in branches.split(",")]
     table_params = [
