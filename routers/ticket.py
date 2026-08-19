@@ -196,3 +196,20 @@ def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     if not results:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return {"items": results}
+
+@router.delete("/{branch_id}/{serial}")
+def delete_ticket(request: Request, branch_id: int, serial: str) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_delete
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Delete ticket stored procedure not configured")
+    try:
+        call_stored_proc(
+            proc_name,
+            {"serial": serial, "branch_id": branch_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+    return {"message": "Ticket deleted successfully"}
