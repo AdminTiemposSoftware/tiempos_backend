@@ -88,6 +88,7 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
             "draw_schedule_id": payload.get("draw_schedule_id"),
             "branch_id": payload.get("branch_id"),
             "details": payload.get("details"),
+            "user_id": payload.get("user_id"),
             "serial": _generate_serial(),
             "amount": _to_decimal_str(total_amount, "amount"),
             "printed_at": printed_at.isoformat(),
