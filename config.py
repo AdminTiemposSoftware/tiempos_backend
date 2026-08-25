@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     winner_pay: str | None = None
     winner_by_serial: str | None = None
     winner_filtered: str | None = None
+    winner_ticket_by_schedule: str | None = None
 
     number_by_draw_schedule: str | None = None
 

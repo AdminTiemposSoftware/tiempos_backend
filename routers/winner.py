@@ -149,3 +149,14 @@ def get_filtered_winner(date_from: str, date_to: str, branches: str, draw_schedu
     ]
     rows = call_stored_proc_table_vars(proc_name, params, table_params)
     return {"items": rows}
+
+@router.get("/by-schedule/{schedule_id}/{date}")
+def get_winner_ticket_by_schedule(schedule_id: int, date: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_ticket_by_schedule, "Winner ticket by schedule stored procedure not configured")
+    params = {
+        "schedule_id": schedule_id,
+        "date": date
+    }
+    rows = call_stored_proc(proc_name, params)
+    return {"items": rows}
