@@ -186,9 +186,34 @@ def update_draw_schedule(
         settings.draw_schedule_update,
         "Draw schedule update stored procedure not configured",
     )
+
+    params = {
+        "draw_schedule_id": draw_schedule_id,
+        "name": payload.get("name"),
+        "is_reventado": payload.get("is_reventado"),
+        "is_megareventado": payload.get("is_megareventado"),
+        "time": payload.get("time")
+    }
+
+    days = payload.get("days")
+    if not isinstance(days, list) or not days:
+        raise HTTPException(status_code=400, detail="days must be a non-empty list")
+    draw_days = []
+
+    for day in days:
+        day_name = day.get("day_name") if isinstance(day, dict) else day
+        draw_days.append((day_name,))
+
+    rows = call_stored_proc_table_var(
+        proc_name,
+        params,
+        "draw_days",
+        "dbo.draw_day_list",
+        ["day_name"],
+        draw_days
+    )
     params = _get_payload(request, payload)
     params = {"draw_schedule_id": draw_schedule_id, **params}
-    rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
