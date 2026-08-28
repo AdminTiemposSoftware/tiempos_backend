@@ -344,8 +344,8 @@ def update_schedule_branch(
     return {"items": rows}
 
 
-@router.get("/by-branch/{branch_id}")
-def get_draw_by_branch(branch_id: str, request: Request) -> dict:
+@router.get("/by-branch/{branch_id}/{date}")
+def get_draw_by_branch(branch_id: str, date: str, request: Request) -> dict:
     _require_auth(request)
     proc_name = _get_proc(
         settings.draw_by_branch,
@@ -353,6 +353,7 @@ def get_draw_by_branch(branch_id: str, request: Request) -> dict:
     )
     params = dict(request.query_params)
     params.setdefault("branch_id", branch_id)
+    params.setdefault("date", date)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
