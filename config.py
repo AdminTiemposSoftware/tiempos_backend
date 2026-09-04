@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     winner_ticket_by_schedule: str | None = None
 
     number_by_draw_schedule: str | None = None
+    number_total_operation_create: str | None = None
 
     position_by_banking: str | None = None
     position_create: str | None = None

@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
 from fastapi import APIRouter, Body, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -6,6 +8,7 @@ from db import call_stored_proc, call_stored_proc_table_vars
 from routers.auth import _require_auth
 
 router = APIRouter(prefix="/number", tags=["number"])
+routerOperations = APIRouter(prefix="/number/operations", tags=["operations"])
 
 def _get_proc(proc_name: str | None, detail: str) -> str:
     if not proc_name:
@@ -104,4 +107,71 @@ def get_prohibited_filtered(date_from: str, date_to: str, branches: str, request
         }
     ]
     rows = call_stored_proc_table_vars(proc_name, params, table_params)
+    return {"items": rows}
+
+
+@routerOperations.get("/")
+def get_operations():
+    return {"items": []}
+
+def _to_decimal_str(value: object, field_name: str) -> str:
+    try:
+        normalized = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return format(normalized, "f")
+    except (InvalidOperation, TypeError):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a decimal value") from None
+
+
+@routerOperations.post("")
+def create_operation(
+    request: Request,
+    payload: dict[str, object] | None = Body(default=None),
+) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.number_total_operation_create,
+        "Number total operation create stored procedure not configured",
+    )
+    params = _get_payload(request, payload)
+
+    operations = params.get("operations")
+    if not isinstance(operations, list) or not operations:
+        raise HTTPException(status_code=400, detail="operations must be a non-empty list")
+
+    date = params.get("date")
+    if date is None or str(date).strip() == "":
+        raise HTTPException(status_code=400, detail="date is required")
+
+    table_rows: list[tuple[str, int, str]] = []
+    for operation in operations:
+        if not isinstance(operation, dict):
+            raise HTTPException(status_code=400, detail="Each operation must be an object")
+
+        operation_code = operation.get("operation")
+        number_total_id = operation.get("number_total_id")
+        amount = operation.get("amount")
+
+        if operation_code is None or str(operation_code).strip() == "":
+            raise HTTPException(status_code=400, detail="Each operation must include operation")
+        try:
+            parsed_number_total_id = int(number_total_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Each operation must include a valid number_total_id") from None
+        if parsed_number_total_id <= 0:
+            raise HTTPException(status_code=400, detail="Each operation must include a valid number_total_id")
+        if amount is None:
+            raise HTTPException(status_code=400, detail="Each operation must include amount")
+
+        table_rows.append((str(operation_code), parsed_number_total_id, _to_decimal_str(amount, "operations.amount")))
+
+    rows = call_stored_proc_table_vars(
+        proc_name,
+        {"date": date},
+        [{
+            "param": "operations",
+            "type": "dbo.number_total_operation_list",
+            "columns": ["operation", "number_total_id", "amount"],
+            "rows": table_rows,
+        }],
+    )
     return {"items": rows}
