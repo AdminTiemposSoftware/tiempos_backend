@@ -160,3 +160,23 @@ def get_winner_ticket_by_schedule(schedule_id: int, date: str, request: Request)
     }
     rows = call_stored_proc(proc_name, params)
     return {"items": rows}
+
+@router.get(f"/ticket/filtered")
+def get_filtered_ticket(date_from: str, date_to: str, draw_schedules: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_ticket_filtered, "Filtered winner ticket stored procedure not configured")
+    params = {
+        "date_from": date_from,
+        "date_to": date_to
+    }
+    draw_schedules_list = [(int(x),) for x in draw_schedules.split(",")]
+    table_params = [
+        {
+            "param": "draw_schedules",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": draw_schedules_list
+        }
+    ]
+    rows = call_stored_proc_table_vars(proc_name, params, table_params)
+    return {"items": rows}
