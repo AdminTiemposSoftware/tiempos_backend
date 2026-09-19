@@ -180,3 +180,11 @@ def get_filtered_ticket(date_from: str, date_to: str, draw_schedules: str, reque
     ]
     rows = call_stored_proc_table_vars(proc_name, params, table_params)
     return {"items": rows}
+
+
+@router.delete("/{id}")
+def delete_winner(id: int, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_delete, "Delete winner stored procedure not configured")
+    rows = call_stored_proc(proc_name, {"winner_id": id})
+    return {"items": rows}

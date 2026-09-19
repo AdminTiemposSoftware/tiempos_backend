@@ -253,6 +253,7 @@ def delete_draw_schedule(
     return {"items": rows}
 
 
+
 @draw_day_router.get("")
 def list_draw_day(request: Request) -> dict:
     proc_name = _get_proc(
@@ -368,6 +369,19 @@ def get_draw_by_branch(branch_id: str, request: Request) -> dict:
     )
     params = dict(request.query_params)
     params.setdefault("branch_id", branch_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
+@draw_schedule_branch_router.get("/by-banking/{banking_id}")
+def list_draw_schedule_branch(banking_id: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.draw_schedule_branch_by_banking,
+        "Draw schedule branch by banking stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 

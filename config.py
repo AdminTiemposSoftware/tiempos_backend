@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     draw_schedule_update: str | None = None
     draw_schedule_delete: str | None = None
     draw_schedule_branch_create: str | None = None
+    draw_schedule_branch_by_banking: str | None = None
 
     draw_day: str | None = None
     draw_day_create: str | None = None
@@ -72,9 +73,13 @@ class Settings(BaseSettings):
     winner_filtered: str | None = None
     winner_ticket_by_schedule: str | None = None
     winner_ticket_filtered: str | None = None
+    winner_delete: str | None = None
 
     number_by_draw_schedule: str | None = None
+    number_total_operation: str | None = None
     number_total_operation_create: str | None = None
+    number_total_registry: str | None = None
+    number_total_registry_create: str | None = None
 
     position_by_banking: str | None = None
     position_create: str | None = None
