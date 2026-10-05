@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     number_total_operation_create: str | None = None
     number_total_registry: str | None = None
     number_total_registry_create: str | None = None
+    number_total_registry_filtered: str | None = None
 
     position_by_banking: str | None = None
     position_create: str | None = None

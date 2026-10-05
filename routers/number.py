@@ -299,3 +299,30 @@ def post_registry(
         raise HTTPException(status_code=500, detail="Database error") from exc
 
     return {"items": rows}
+
+@router.get("/registry/filtered")
+def get_filtered_report(date_from: str, date_to: str, branches: str, draw_schedules: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.number_total_registry_filtered, "stored procedure not configured")
+    params = {
+        "date_from": date_from,
+        "date_to": date_to
+    }
+    branches_list = [(int(x),) for x in branches.split(",")]
+    draw_schedules_list = [(int(x),) for x in draw_schedules.split(",")]
+    table_params = [
+        {
+            "param": "branches",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": branches_list
+        },
+        {
+            "param": "draw_schedules",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": draw_schedules_list
+        }
+    ]
+    rows = call_stored_proc_table_vars(proc_name, params, table_params)
+    return {"items": rows}
