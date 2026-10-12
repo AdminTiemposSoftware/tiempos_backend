@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from config import settings
 from routers import auth, banking, branch, draw, ticket, winner, position
 from routers import health, user, number, report
+from routers import amount
 from db import start_scheduler, stop_scheduler
 
 @asynccontextmanager
@@ -31,3 +32,4 @@ app.include_router(number.routerOperations)
 app.include_router(report.router)
 app.include_router(winner.router)
 app.include_router(position.router)
+app.include_router(amount.router)

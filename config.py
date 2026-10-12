@@ -86,6 +86,11 @@ class Settings(BaseSettings):
     position_create: str | None = None
     position_update: str | None = None
 
+    amount_name_by_branch: str | None = None
+    amount_name_create: str | None = None
+    amount_name_update: str | None = None
+    amount_name_delete: str | None = None
+
     auth_user: str | None = None
     auth_secret: str = ""
     auth_token_ttl_seconds: int = 86400
