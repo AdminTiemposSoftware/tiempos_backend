@@ -55,6 +55,6 @@ def delete_amount(request: Request, amount_name_id: str) -> dict:
     _require_auth(request)
     proc_name = _get_proc(settings.amount_name_delete, "stored procedure not configured")
     params = dict(request.query_params)
-    params.setdefault("amount_name_id", amount_name_id)
+    params.setdefault("id", amount_name_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
