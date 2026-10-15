@@ -66,6 +66,7 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
                 _to_decimal_str(number.get("amount"), "numbers.amount"),
                 number["is_reventado"],
                 number["is_megareventado"],
+                number.get("amount_name")
             )
         )
 
@@ -99,8 +100,8 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
                 proc_name,
                 params=params,
                 table_param="numbers",
-                table_type="dbo.ticket_detail_list",
-                table_columns=["number", "amount", "is_reventado", "is_megareventado"],
+                table_type="dbo.ticket_number_list",
+                table_columns=["number", "amount", "is_reventado", "is_megareventado", "amount_name"],
                 table_rows=number_rows,
             )
             return {"items": rows}
