@@ -221,6 +221,7 @@ def _get_cached_base_report(
     date_to: str,
     branch_ids: list[int],
     schedule_ids: list[int],
+    use_cache: bool = True,
 ) -> tuple[dict, bool]:
     cache_key = (date_from, date_to, tuple(branch_ids), tuple(schedule_ids))
     now = datetime.utcnow()
@@ -229,7 +230,7 @@ def _get_cached_base_report(
     with request_lock:
         with _cache_lock:
             cached = _cache.get(cache_key)
-            if cached and now - cached[0] < _CACHE_TTL:
+            if use_cache and cached and now - cached[0] < _CACHE_TTL:
                 return cached[1], True
             _cache.pop(cache_key, None)
 
@@ -280,7 +281,9 @@ def get_base_report(
         raise HTTPException(status_code=400, detail="date_from cannot be after date_to")
     branch_ids = _parse_ids(branches, "branches")
     schedule_ids = _parse_ids(draw_schedules, "draw_schedules")
-    base, cache_hit = _get_cached_base_report(date_from, date_to, branch_ids, schedule_ids)
+    base, cache_hit = _get_cached_base_report(
+        date_from, date_to, branch_ids, schedule_ids, use_cache=False
+    )
     return {
         "items": base["items"],
         "winnersFilteredItems": base["winners"],
