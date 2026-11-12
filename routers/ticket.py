@@ -49,6 +49,7 @@ def _parse_ids(value: str, name: str) -> list[int]:
 
 @router.get("")
 def list_tickets(request: Request) -> dict:
+    _require_auth(request)
     proc_name = settings.tickets_proc
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets stored procedure not configured")
