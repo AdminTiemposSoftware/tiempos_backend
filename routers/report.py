@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta
 from threading import Lock
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -9,13 +11,16 @@ from routers.auth import _require_auth
 
 router = APIRouter(prefix="/report", tags=["report"])
 
+Row = dict[str, Any]
+Rows = list[Row]
+
 # This cache is process-local; deployments with multiple workers/instances do
 # not share entries and may query once per worker. Use a shared cache only if
 # cross-instance reuse becomes a deployment requirement.
 _CACHE_TTL = timedelta(minutes=5)
-_cache: dict[tuple, tuple[datetime, dict]] = {}
+_cache: dict[tuple[Any, ...], tuple[datetime, Row]] = {}
 _cache_lock = Lock()
-_inflight_locks: dict[tuple, Lock] = {}
+_inflight_locks: dict[tuple[Any, ...], Lock] = {}
 _VALID_GROUPING_MODES = {"branch", "draw_schedule", "draw", "date"}
 
 def _get_proc(proc_name: str | None, detail: str) -> str:
@@ -23,7 +28,7 @@ def _get_proc(proc_name: str | None, detail: str) -> str:
         raise HTTPException(status_code=500, detail=detail)
     return proc_name
 
-def _call_proc(proc_name: str, params: dict[str, object] | None = None) -> list[dict]:
+def _call_proc(proc_name: str, params: dict[str, object] | None = None) -> Rows:
     try:
         return call_stored_proc(proc_name, params)
     except ValueError as exc:
@@ -50,7 +55,7 @@ def _date_key(value: object) -> str:
     return str(value or "").replace("T", " ", 1).split(" ", 1)[0]
 
 
-def _normalize_dates(rows: list[dict]) -> list[dict]:
+def _normalize_dates(rows: Rows) -> Rows:
     return [
         {**row, "date": _date_key(row["date"])}
         if row.get("date") is not None else row
@@ -72,7 +77,7 @@ def _flag(value: object) -> bool:
     return bool(value)
 
 
-def _group_value(item: dict, mode: str) -> str:
+def _group_value(item: Row, mode: str) -> str:
     return _date_key(item.get("date")) if mode == "date" else str(item.get({
         "branch": "branch_id",
         "draw_schedule": "draw_schedule_id",
@@ -80,7 +85,7 @@ def _group_value(item: dict, mode: str) -> str:
     }[mode], ""))
 
 
-def _group_label(item: dict, mode: str) -> str:
+def _group_label(item: Row, mode: str) -> str:
     return _date_key(item.get("date")) if mode == "date" else str(item.get({
         "branch": "branch_name",
         "draw_schedule": "draw_schedule_name",
@@ -88,7 +93,7 @@ def _group_label(item: dict, mode: str) -> str:
     }[mode], ""))
 
 
-def _scope_key(item: dict) -> str:
+def _scope_key(item: Row) -> str:
     return (
         f"{_date_key(item.get('date'))}|"
         f"{_number(item.get('branch_id')):g}|"
@@ -96,13 +101,11 @@ def _scope_key(item: dict) -> str:
     )
 
 
-def _configured_percentage(item: dict, prohibited: dict) -> float:
+def _configured_percentage(item: Row, prohibited: Row) -> float:
     for source in (prohibited, item):
         for field in (
-            "percentage",
-            "prohibited_percentage",
-            "branch_prohibited_percentage",
             "draw_schedule_branch_prohibited_percentage",
+            "branch_prohibited_percentage",
         ):
             value = source.get(field)
             if value is not None and str(value).strip() != "":
@@ -110,56 +113,126 @@ def _configured_percentage(item: dict, prohibited: dict) -> float:
     return 0.0
 
 
-def _calculate_groups(items: list[dict], winners: list[dict], prohibited: list[dict],
-                      grouping_modes: list[str]) -> tuple[list[dict], dict[str, float]]:
-    modes = grouping_modes or ["date", "draw_schedule"]
-    unique_winners = {winner.get("winner_id"): winner for winner in winners
-                      if winner.get("winner_id") is not None}
-    winners_by_schedule: dict[str, list[dict]] = {}
-    for winner in unique_winners.values():
+def _index_winners(winners: Rows) -> dict[str, Rows]:
+    unique = {
+        winner.get("winner_id"): winner
+        for winner in winners
+        if winner.get("winner_id") is not None
+    }
+    indexed: dict[str, Rows] = {}
+    for winner in unique.values():
         key = f"{_date_key(winner.get('date'))}|{winner.get('schedule_id', winner.get('draw_schedule_id'))}"
-        winners_by_schedule.setdefault(key, []).append(winner)
-    prohibited_by_number: dict[str, list[dict]] = {}
+        indexed.setdefault(key, []).append(winner)
+    return indexed
+
+
+def _index_prohibited(prohibited: Rows) -> dict[str, Rows]:
+    indexed: dict[str, Rows] = {}
     for row in prohibited:
-        key = f"{row.get('date')}|{_number(row.get('number')):g}"
-        prohibited_by_number.setdefault(key, []).append(row)
+        key = f"{_date_key(row.get('date'))}|{_number(row.get('number')):g}"
+        indexed.setdefault(key, []).append(row)
+    return indexed
+
+
+def _find_prohibited(item: Row, prohibited_by_number: dict[str, Rows]) -> Row | None:
+    candidates = prohibited_by_number.get(
+        f"{_date_key(item.get('date'))}|{_number(item.get('number')):g}", []
+    )
+    return next(
+        (
+            row for row in candidates
+            if row.get("branch_id") is None
+            or _number(row.get("branch_id")) == _number(item.get("branch_id"))
+        ),
+        None,
+    )
+
+
+def _calculate_devolution(
+    item: Row, prohibited: Row | None, scope_total: float,
+) -> tuple[float, float | None, float, str | None]:
+    if prohibited is None:
+        return 0.0, None, 0.0, None
+    if _flag(prohibited.get("by_amount")):
+        limit = _number(prohibited.get("amount"))
+        return max(_number(item.get("amount")) - limit, 0), None, limit, "amount"
+    if _flag(prohibited.get("by_percentage")):
+        percentage = _configured_percentage(item, prohibited)
+        limit = scope_total * percentage * .01
+        devolution = (
+            max(_number(item.get("amount")) - limit, 0)
+            if _number(item.get("amount")) > _number(prohibited.get("starter"))
+            else 0
+        )
+        return devolution, percentage, limit, "percentage"
+    return 0.0, None, 0.0, None
+
+
+def _prepare_items(
+    items: Rows, winners: Rows, prohibited: Rows,
+) -> Rows:
+    winners_by_schedule = _index_winners(winners)
+    prohibited_by_number = _index_prohibited(prohibited)
     scope_totals: dict[str, float] = {}
     for item in items:
         key = _scope_key(item)
-        scope_totals[key] = scope_totals.get(key, 0) + _number(item.get("amount"))
+        scope_totals[key] = scope_totals.get(key, 0.0) + _number(item.get("amount"))
 
-    primary: dict[str, dict] = {}
-    secondary_modes = modes[1:] or modes
+    prepared = []
     for item in items:
         amount = _number(item.get("amount"))
-        scope_key = _scope_key(item)
-        candidates = prohibited_by_number.get(
-            f"{item.get('date')}|{_number(item.get('number')):g}", []
+        prohibited_row = _find_prohibited(item, prohibited_by_number)
+        devolution, percentage, limit, devolution_mode = _calculate_devolution(
+            item, prohibited_row, scope_totals[_scope_key(item)]
         )
-        prohibited_row = next((row for row in candidates
-                if (row.get("branch_id") is None)
-                or (_number(row.get("branch_id")) == _number(item.get("branch_id")))),
-            None,
-        )
-        devolution = 0.0
-        if prohibited_row:
-            if _flag(prohibited_row.get("by_amount")):
-                limit = _number(prohibited_row.get("amount"))
-                devolution = max(amount - limit, 0)
-            elif _flag(prohibited_row.get("by_percentage")):
-                starter = _number(prohibited_row.get("starter"))
-                percentage = _configured_percentage(item, prohibited_row)
-                limit = scope_totals[scope_key] * percentage * .01
-                devolution = max(amount - limit, 0) if amount > starter else 0
         winner_key = f"{_date_key(item.get('date'))}|{item.get('draw_schedule_id')}"
         row_winners = winners_by_schedule.get(winner_key, [])
-        winner_total = 0.0
-        for winner in row_winners:
-            if float(winner.get("winner_number") or -1) == float(item.get("number") or -2):
-                winner_total += (amount - devolution) * _number(winner.get("position_multiplier"))
-                first_place = item.get("branch_buy_first_place")
-                if first_place is not None:
-                    winner_total += devolution * _number(first_place)
+        winner_base = sum(
+            (amount - devolution) * _number(winner.get("position_multiplier"))
+            for winner in row_winners
+            if float(winner.get("winner_number") or -1) == float(item.get("number") or -2)
+        )
+        devolution_winner_total = sum(
+            devolution * _number(item.get("branch_buy_first_place"))
+            for winner in row_winners
+            if float(winner.get("winner_number") or -1) == float(item.get("number") or -2)
+            and item.get("branch_buy_first_place") is not None
+        )
+        prepared.append({
+            "item": item,
+            "amount": amount,
+            "prohibited": prohibited_row,
+            "devolution": devolution,
+            "devolution_percentage": percentage,
+            "devolution_limit": limit,
+            "devolution_mode": devolution_mode,
+            "winners": row_winners,
+            "winner_base": winner_base,
+            "devolution_winner_total": devolution_winner_total,
+            "winner_total": winner_base + devolution_winner_total,
+            "comission": (amount - devolution) * _number(item.get("branch_comission")) * .01,
+            "buy": devolution * _number(item.get("branch_buy")) * .01,
+        })
+    return prepared
+
+
+def _calculate_groups(items: Rows, winners: Rows, prohibited: Rows,
+                      grouping_modes: list[str], prepared: Rows | None = None,
+                      ) -> tuple[Rows, dict[str, float]]:
+    modes = grouping_modes or ["date", "draw_schedule"]
+    prepared = prepared if prepared is not None else _prepare_items(items, winners, prohibited)
+
+    primary: dict[str, Row] = {}
+    secondary_modes = modes[1:] or modes
+    for calculated in prepared:
+        item = calculated["item"]
+        amount = calculated["amount"]
+        prohibited_row = calculated["prohibited"]
+        devolution = calculated["devolution"]
+        row_winners = calculated["winners"]
+        winner_total = calculated["winner_total"]
+        winner_base = calculated["winner_base"]
+        devolution_winner_total = calculated["devolution_winner_total"]
         p_id, s_id = _group_value(item, modes[0]), "|".join(_group_value(item, m) for m in secondary_modes)
         group = primary.setdefault(p_id, {"id": p_id, "label": _group_label(item, modes[0]), "rows": {}})
         row = group["rows"].setdefault(s_id, {
@@ -167,14 +240,17 @@ def _calculate_groups(items: list[dict], winners: list[dict], prohibited: list[d
             "label": " - ".join(_group_label(item, m) for m in secondary_modes),
             "winners": row_winners.copy(), "winner_total": 0.0, "overageNumbers": [],
             "total": 0.0, "devolution": 0.0, "comission": 0.0, "buy": 0.0,
+            "winner_base": 0.0, "devolution_winner_total": 0.0,
         })
         row["total"] += amount
         row["devolution"] += devolution
         row["winner_total"] += winner_total
+        row["winner_base"] += winner_base
+        row["devolution_winner_total"] += devolution_winner_total
         # Rates belong to each source item. Add each item's contribution
         # instead of applying the last item's rate to the cumulative row.
-        row["comission"] += (amount - devolution) * _number(item.get("branch_comission")) * .01
-        row["buy"] += devolution * _number(item.get("branch_buy")) * .01
+        row["comission"] += calculated["comission"]
+        row["buy"] += calculated["buy"]
         row["net"] = row["total"] - row["comission"] - row["winner_total"]
         row["winner_numbers"] = [
             winner.get("winner_number") for winner in row["winners"]
@@ -184,7 +260,11 @@ def _calculate_groups(items: list[dict], winners: list[dict], prohibited: list[d
             row["overageNumbers"].append({"number": item.get("number"), "amount": amount,
                                           "overage": 0, "prohibited": prohibited_row})
     result = []
-    totals = {"total": 0.0, "comission": 0.0, "devolution": 0.0, "buy": 0.0, "winner_total": 0.0, "net": 0.0}
+    totals = {
+        "total": 0.0, "comission": 0.0, "devolution": 0.0, "buy": 0.0,
+        "winner_total": 0.0, "winner_base": 0.0,
+        "devolution_winner_total": 0.0, "net": 0.0,
+    }
     for group in sorted(primary.values(), key=lambda value: value["label"]):
         group.update({
             "total": 0.0,
@@ -200,6 +280,8 @@ def _calculate_groups(items: list[dict], winners: list[dict], prohibited: list[d
             for key in ("total", "comission", "devolution", "buy", "winner_total"):
                 group[key] += row[key]
                 totals[key] += row[key]
+            totals["winner_base"] += row["winner_base"]
+            totals["devolution_winner_total"] += row["devolution_winner_total"]
             totals["net"] += row["net"]
         group["net"] = group["total"] - group["comission"] - group["winner_total"]
         group["rows"] = rows
@@ -207,8 +289,126 @@ def _calculate_groups(items: list[dict], winners: list[dict], prohibited: list[d
             result.append(group)
     return result, totals
 
+
+def _calculate_number_report(
+    items: Rows, winners: Rows, prohibited: Rows,
+) -> tuple[Rows, dict[str, Rows], Rows, dict[str, float]]:
+    """Return the compact matrix payload and the calculations used by its summary."""
+    prepared = _prepare_items(items, winners, prohibited)
+    _, totals = _calculate_groups(
+        items, winners, prohibited, ["draw", "draw_schedule", "branch"], prepared
+    )
+    numbers = {number: 0.0 for number in range(100)}
+    breakdown: dict[str, dict[tuple[Any, ...], Row]] = {}
+    devolution_rows: dict[tuple[Any, ...], Row] = {}
+    for calculated in prepared:
+        item = calculated["item"]
+        number = int(_number(item.get("number"), -1))
+        if not 0 <= number <= 99:
+            continue
+        amount = calculated["amount"]
+        numbers[number] += amount
+        key = (
+            str(item.get("draw_name") or ""),
+            str(item.get("draw_schedule_name") or ""),
+            str(item.get("branch_name") or ""),
+        )
+        row = breakdown.setdefault(str(number), {}).setdefault(key, {
+            "draw": key[0], "draw_schedule": key[1], "branch": key[2], "total": 0.0,
+        })
+        row["total"] += amount
+
+        mode = calculated["devolution_mode"]
+        if mode is None:
+            continue
+        percentage = calculated["devolution_percentage"]
+        limit = calculated["devolution_limit"]
+        devolution = calculated["devolution"]
+        if devolution <= 0:
+            continue
+        detail_key = (
+            number, _date_key(item.get("date")), str(item.get("branch_name") or ""),
+            str(item.get("draw_schedule_name") or ""),
+        )
+        detail = devolution_rows.setdefault(detail_key, {
+            "number": number,
+            "date": item.get("date"),
+            "branch": str(item.get("branch_name") or ""),
+            "schedule": str(item.get("draw_schedule_name") or ""),
+            "amount": 0.0,
+            "limit": limit,
+            "percentage": percentage,
+            "percentageLimit": limit if mode == "percentage" else 0.0,
+            "devolution": 0.0,
+            "mode": mode,
+        })
+        detail["amount"] += amount
+        detail["devolution"] += devolution
+
+    devolution_by_number: dict[int, Row] = {}
+    for detail in devolution_rows.values():
+        number = detail["number"]
+        row = devolution_by_number.setdefault(number, {
+            "number": number,
+            "date": detail["date"],
+            "branch": detail["branch"],
+            "schedule": detail["schedule"],
+            "amount": 0.0,
+            "limit": 0.0,
+            "percentageLimit": 0.0,
+            "percentage": detail["percentage"],
+            "devolution": 0.0,
+            "mode": detail["mode"],
+            "details": [],
+        })
+        if row["mode"] != detail["mode"] or row["percentage"] != detail["percentage"]:
+            row["mode"] = "mixed"
+            row["percentage"] = None
+        row["amount"] += detail["amount"]
+        row["limit"] += detail["limit"]
+        row["percentageLimit"] += detail["percentageLimit"]
+        row["devolution"] += detail["devolution"]
+        row["details"].append({
+            key: detail[key] for key in (
+                "date", "branch", "schedule", "amount", "limit",
+                "percentage", "devolution", "mode",
+            )
+        })
+
+    return (
+        [{"number": number, "total": total} for number, total in numbers.items()],
+        {number: list(rows.values()) for number, rows in breakdown.items()},
+        list(devolution_by_number.values()),
+        totals,
+    )
+
+
+def _summary_values(totals: dict[str, float]) -> dict[str, float]:
+    total = totals["total"]
+    devolution = totals["devolution"]
+    commission = totals["comission"]
+    winner_total = totals.get("winner_base", totals["winner_total"])
+    devolution_winner_total = totals.get("devolution_winner_total", 0.0)
+    adjusted_total = total - devolution
+    net_devolution = devolution - devolution_winner_total
+    net_total = adjusted_total - commission - winner_total
+    return {
+        "total": total,
+        "devolution": devolution,
+        "devolution_buy": totals["buy"],
+        "devolution_winner_total": devolution_winner_total,
+        "net_devolution": net_devolution,
+        "adjusted_total": adjusted_total,
+        "commission": commission,
+        "winner_total": winner_total,
+        "net_total": net_total,
+        "real_commission": commission + totals["buy"],
+        "real_winner_total": winner_total + devolution_winner_total,
+        "real_net_total": net_total + net_devolution,
+    }
+
 @router.get("/today/{banking_id}")
-def get_report_of_today(banking_id: str, request: Request) -> dict:
+def get_report_of_today(banking_id: str, request: Request) -> Row:
     _require_auth(request)
     proc_name = _get_proc(settings.report_today, "Report of today stored procedure not configured")
     params = {"banking_id": banking_id}
@@ -222,7 +422,7 @@ def _get_cached_base_report(
     branch_ids: list[int],
     schedule_ids: list[int],
     use_cache: bool = True,
-) -> tuple[dict, bool]:
+) -> tuple[Row, bool]:
     cache_key = (date_from, date_to, tuple(branch_ids), tuple(schedule_ids))
     now = datetime.utcnow()
     with _cache_lock:
@@ -270,7 +470,7 @@ def _get_cached_base_report(
 @router.get("/base")
 def get_base_report(
     date_from: str, date_to: str, branches: str, draw_schedules: str, request: Request,
-) -> dict:
+) -> Row:
     _require_auth(request)
     try:
         parsed_from = date.fromisoformat(date_from)
@@ -284,8 +484,14 @@ def get_base_report(
     base, cache_hit = _get_cached_base_report(
         date_from, date_to, branch_ids, schedule_ids, use_cache=False
     )
+    numbers, breakdown, devolution_breakdown, totals = _calculate_number_report(
+        base["items"], base["winners"], base["prohibited"]
+    )
     return {
-        "items": base["items"],
+        "numbers": numbers,
+        "breakdown": breakdown,
+        "devolutionBreakdown": devolution_breakdown,
+        "summary": _summary_values(totals),
         "winnersFilteredItems": base["winners"],
         "prohibitedFilteredItems": base["prohibited"],
         "cache": {"hit": cache_hit, "ttl_seconds": int(_CACHE_TTL.total_seconds())},
@@ -297,7 +503,7 @@ def get_filtered_report(
     date_from: str,
     date_to: str, branches: str, draw_schedules: str, request: Request,
     grouping_modes: str = Query("date,draw_schedule"),
-) -> dict:
+) -> Row:
     _require_auth(request)
     try:
         parsed_from = date.fromisoformat(date_from)
