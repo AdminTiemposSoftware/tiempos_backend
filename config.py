@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     ticket_by_schedule: str | None = None
     ticket_by_winner: str | None = None
     ticket_by_serial: str | None = None
+    ticket_filtered: str | None = None
 
     branch_create: str | None = None
     branch_update: str | None = None
