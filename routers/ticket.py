@@ -8,7 +8,12 @@ from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
 from config import settings
-from db import call_stored_proc, call_stored_proc_multi, call_stored_proc_table_var
+from db import (
+    call_stored_proc,
+    call_stored_proc_multi,
+    call_stored_proc_table_var,
+    call_stored_proc_table_vars_multi,
+)
 
 from routers.auth import _require_auth
 
@@ -31,8 +36,20 @@ def _is_duplicate_serial_error(exc: Exception) -> bool:
     message = str(exc).lower()
     return "serial already exists" in message or "uq_ticket_header_serial" in message
 
+
+def _parse_ids(value: str, name: str) -> list[int]:
+    try:
+        ids = sorted({int(part.strip()) for part in value.split(",") if part.strip()})
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{name} must contain integer IDs") from None
+    if not ids or any(identifier <= 0 for identifier in ids):
+        raise HTTPException(status_code=400, detail=f"{name} must contain at least one positive ID")
+    return ids
+
+
 @router.get("")
 def list_tickets(request: Request) -> dict:
+    _require_auth(request)
     proc_name = settings.tickets_proc
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets stored procedure not configured")
@@ -46,6 +63,52 @@ def list_tickets(request: Request) -> dict:
         raise HTTPException(status_code=500, detail="Database error") from exc
 
     return {"items": rows}
+
+
+@router.get("/filtered")
+def get_filtered_tickets(
+    date_from: date,
+    date_to: date,
+    branches: str,
+    draw_schedules: str,
+    request: Request,
+) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_filtered
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Filtered tickets stored procedure not configured")
+
+    table_params = [
+        {
+            "param": "branches",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": [(identifier,) for identifier in _parse_ids(branches, "branches")],
+        },
+        {
+            "param": "draw_schedules",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": [(identifier,) for identifier in _parse_ids(draw_schedules, "draw_schedules")],
+        },
+    ]
+
+    try:
+        result_sets = call_stored_proc_table_vars_multi(
+            proc_name,
+            {"date_from": date_from, "date_to": date_to},
+            table_params,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    return {
+        "items": result_sets[0] if len(result_sets) > 0 else [],
+        "numbers": result_sets[1] if len(result_sets) > 1 else [],
+    }
+
 
 @router.post("")
 def create_ticket(request: Request, payload: dict[str, object]) -> dict:
@@ -201,14 +264,18 @@ def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
 
 @router.delete("/{branch_id}/{serial}")
 def delete_ticket(request: Request, branch_id: int, serial: str) -> dict:
-    _require_auth(request)
+    auth_payload = _require_auth(request)
     proc_name = settings.ticket_delete
     if not proc_name:
         raise HTTPException(status_code=500, detail="Delete ticket stored procedure not configured")
     try:
         call_stored_proc(
             proc_name,
-            {"serial": serial, "branch_id": branch_id},
+            {
+                "serial": serial,
+                "branch_id": branch_id,
+                "deleted_by": auth_payload["sub"],
+            },
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
