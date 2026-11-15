@@ -1,11 +1,11 @@
-import numbers
-import secrets
+﻿import numbers
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from routers.auth import _require_auth
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
+from pyodbc import Error as ODBCError
 
 from config import settings
 from db import (
@@ -26,16 +26,6 @@ def _to_decimal_str(value: object, field_name: str) -> str:
         return format(normalized, "f")
     except (InvalidOperation, TypeError):
         raise HTTPException(status_code=400, detail=f"{field_name} must be a decimal value")
-
-# TODO: Consider using a more robust method for generating unique serials, such as a database sequence or UUIDs, to avoid potential collisions in high-concurrency scenarios.
-def _generate_serial() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
-
-
-def _is_duplicate_serial_error(exc: Exception) -> bool:
-    message = str(exc).lower()
-    return "serial already exists" in message or "uq_ticket_header_serial" in message
-
 
 def _parse_ids(value: str, name: str) -> list[int]:
     try:
@@ -144,37 +134,41 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
         raise HTTPException(status_code=400, detail="date is required")
     printed_at = datetime.now() + timedelta(hours=settings.HOUR_OFFSET)
 
-    last_error: Exception | None = None
-    # TODO : Implement a more robust mechanism for generating unique serials, possibly using a database sequence or UUIDs.
-    for _ in range(10):
-        params = {
-            "date": date,
-            "draw_schedule_id": payload.get("draw_schedule_id"),
-            "branch_id": payload.get("branch_id"),
-            "details": payload.get("details"),
-            "user_id": payload.get("user_id"),
-            "serial": _generate_serial(),
-            "amount": _to_decimal_str(total_amount, "amount"),
-            "printed_at": printed_at.isoformat(),
-        }
+    params = {
+        "date": date,
+        "draw_schedule_id": payload.get("draw_schedule_id"),
+        "branch_id": payload.get("branch_id"),
+        "details": payload.get("details"),
+        "user_id": payload.get("user_id"),
+        "serial": None,
+        "amount": _to_decimal_str(total_amount, "amount"),
+        "printed_at": printed_at.isoformat(),
+    }
 
-        try:
-            rows = call_stored_proc_table_var(
-                proc_name,
-                params=params,
-                table_param="numbers",
-                table_type="dbo.ticket_number_list",
-                table_columns=["number", "amount", "is_reventado", "is_megareventado", "amount_name"],
-                table_rows=number_rows,
-            )
-            return {"items": rows}
-        except SQLAlchemyError as exc:
-            if _is_duplicate_serial_error(exc):
-                last_error = exc
-                continue
-            raise HTTPException(status_code=500, detail="Database error") from exc
+    try:
+        rows = call_stored_proc_table_var(
+            proc_name,
+            params=params,
+            table_param="numbers",
+            table_type="dbo.ticket_number_list",
+            table_columns=["number", "amount", "is_reventado", "is_megareventado", "amount_name"],
+            table_rows=number_rows,
+        )
+    except (SQLAlchemyError, ODBCError) as exc:
+        message = str(exc).lower()
+        if "no free random ticket serial found after 256 attempts" in message:
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to allocate a ticket serial. Please try again later.",
+            ) from exc
+        if "unable to acquire the ticket serial lock" in message:
+            raise HTTPException(
+                status_code=503,
+                detail="Ticket creation is temporarily unavailable. Please try again later.",
+            ) from exc
+        raise HTTPException(status_code=500, detail="Database error") from exc
 
-    raise HTTPException(status_code=500, detail="Unable to generate a unique ticket serial") from last_error
+    return {"items": rows}
 
 @router.get("/by-schedule/{draw_schedule_id}/{branch_id}/{date}")
 def get_tickets_by_schedule(request: Request, draw_schedule_id: int, branch_id: int, date: date) -> dict:
@@ -282,3 +276,4 @@ def delete_ticket(request: Request, branch_id: int, serial: str) -> dict:
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="Database error") from exc
     return {"message": "Ticket deleted successfully"}
+
