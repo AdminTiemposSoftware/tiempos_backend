@@ -265,6 +265,81 @@ def call_stored_proc_table_vars(
         conn.close()
 
 
+def call_stored_proc_table_vars_multi(
+    proc_name: str,
+    params: Mapping[str, object],
+    table_params: list[dict],
+) -> list[list[dict]]:
+    conn = engine.raw_connection()
+    cursor = None
+
+    try:
+        cursor = conn.cursor()
+        _validate_identifier(proc_name, "proc_name", allow_qualified=True)
+
+        declarations = []
+        inserts = []
+        values = []
+
+        for tp in table_params:
+            param = tp["param"]
+            table_type = tp["type"]
+            columns = tp["columns"]
+            rows = tp["rows"]
+
+            _validate_identifier(param, "table_param")
+            _validate_identifier(table_type, "table_type", allow_qualified=True)
+            for col in columns:
+                _validate_identifier(col, "table column")
+
+            declarations.append(f"DECLARE @{param} {table_type};")
+            if rows:
+                placeholders = ", ".join(
+                    "(" + ", ".join(["?"] * len(columns)) + ")"
+                    for _ in rows
+                )
+                inserts.append(
+                    f"INSERT INTO @{param} ({', '.join(columns)}) VALUES {placeholders};"
+                )
+                values.extend(value for row in rows for value in row)
+
+        scalar_items = list(params.items())
+        for key, _ in scalar_items:
+            _validate_identifier(key, "param")
+
+        exec_params = [f"@{key}=?" for key, _ in scalar_items]
+        exec_params.extend(f"@{tp['param']}=@{tp['param']}" for tp in table_params)
+        values.extend(value for _, value in scalar_items)
+
+        sql = (
+            f"{' '.join(declarations)} {' '.join(inserts)} "
+            f"EXEC {proc_name} {', '.join(exec_params)}"
+        )
+        cursor.execute(sql, values)
+
+        result_sets: list[list[dict]] = []
+        while True:
+            if cursor.description:
+                columns = [column[0] for column in cursor.description]
+                result_sets.append([dict(zip(columns, row)) for row in cursor.fetchall()])
+            elif not cursor.nextset():
+                break
+            else:
+                continue
+            if not cursor.nextset():
+                break
+
+        conn.commit()
+        return result_sets
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
+
+
 scheduler = BackgroundScheduler()
 
 def archive_due_number_totals():
