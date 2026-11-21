@@ -262,6 +262,36 @@ def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return {"items": results}
 
+
+@router.get("/by-serial-banking/{banking_id}/{serial}")
+def get_ticket_by_serial_by_banking(request: Request, banking_id: int, serial: str) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_by_serial_banking
+    if not proc_name:
+        raise HTTPException(
+            status_code=500,
+            detail="Tickets by serial and banking stored procedure not configured",
+        )
+
+    try:
+        result_sets = call_stored_proc_multi(
+            proc_name,
+            {"serial": serial, "banking_id": banking_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        if "50001" in str(exc) or "does not exist" in str(exc).lower():
+            raise HTTPException(status_code=404, detail="Ticket not found") from exc
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    items = result_sets[0] if len(result_sets) > 0 else []
+    numbers = result_sets[1] if len(result_sets) > 1 else []
+    if not items:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {"items": items, "numbers": numbers}
+
+
 @router.delete("/{branch_id}/{serial}")
 def delete_ticket(request: Request, branch_id: int, serial: str) -> dict:
     auth_payload = _require_auth(request)
