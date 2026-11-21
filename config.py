@@ -12,9 +12,12 @@ class Settings(BaseSettings):
 
     ticket_from_today_by_branch: str | None = None
     ticket_create: str | None = None
+    ticket_delete: str | None = None
     ticket_by_schedule: str | None = None
     ticket_by_winner: str | None = None
     ticket_by_serial: str | None = None
+    ticket_by_serial_banking: str | None = None
+    ticket_filtered: str | None = None
 
     branch_create: str | None = None
     branch_update: str | None = None
@@ -34,11 +37,13 @@ class Settings(BaseSettings):
 
     draw_schedule: str | None = None
     draw_schedule_by_branch: str | None = None
+    draw_schedule_available_by_branch: str | None = None
     draw_schedule_names: str | None = None
     draw_schedule_create: str | None = None
     draw_schedule_update: str | None = None
     draw_schedule_delete: str | None = None
     draw_schedule_branch_create: str | None = None
+    draw_schedule_branch_by_banking: str | None = None
 
     draw_day: str | None = None
     draw_day_create: str | None = None
@@ -56,6 +61,7 @@ class Settings(BaseSettings):
     prohibited_delete: str | None = None
     prohibited_by_banking_id: str | None = None
     prohibited_by_branch_id: str | None = None
+    prohibited_filtered: str | None = None
 
     report_today: str | None = None
     report_filtered: str | None = None
@@ -66,12 +72,26 @@ class Settings(BaseSettings):
     winner_create: str | None = None
     winner_pay: str | None = None
     winner_by_serial: str | None = None
+    winner_filtered: str | None = None
+    winner_ticket_by_schedule: str | None = None
+    winner_ticket_filtered: str | None = None
+    winner_delete: str | None = None
 
     number_by_draw_schedule: str | None = None
+    number_total_operation: str | None = None
+    number_total_operation_create: str | None = None
+    number_total_registry: str | None = None
+    number_total_registry_create: str | None = None
+    number_total_registry_filtered: str | None = None
 
     position_by_banking: str | None = None
     position_create: str | None = None
     position_update: str | None = None
+
+    amount_name_by_branch: str | None = None
+    amount_name_create: str | None = None
+    amount_name_update: str | None = None
+    amount_name_delete: str | None = None
 
     auth_user: str | None = None
     auth_secret: str = ""

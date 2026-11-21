@@ -1,14 +1,19 @@
-import numbers
-import secrets
+﻿import numbers
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from routers.auth import _require_auth
 
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
+from pyodbc import Error as ODBCError
 
 from config import settings
-from db import call_stored_proc, call_stored_proc_multi, call_stored_proc_table_var
+from db import (
+    call_stored_proc,
+    call_stored_proc_multi,
+    call_stored_proc_table_var,
+    call_stored_proc_table_vars_multi,
+)
 
 from routers.auth import _require_auth
 
@@ -22,17 +27,19 @@ def _to_decimal_str(value: object, field_name: str) -> str:
     except (InvalidOperation, TypeError):
         raise HTTPException(status_code=400, detail=f"{field_name} must be a decimal value")
 
-# TODO: Consider using a more robust method for generating unique serials, such as a database sequence or UUIDs, to avoid potential collisions in high-concurrency scenarios.
-def _generate_serial() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
+def _parse_ids(value: str, name: str) -> list[int]:
+    try:
+        ids = sorted({int(part.strip()) for part in value.split(",") if part.strip()})
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{name} must contain integer IDs") from None
+    if not ids or any(identifier <= 0 for identifier in ids):
+        raise HTTPException(status_code=400, detail=f"{name} must contain at least one positive ID")
+    return ids
 
-
-def _is_duplicate_serial_error(exc: Exception) -> bool:
-    message = str(exc).lower()
-    return "serial already exists" in message or "uq_ticket_header_serial" in message
 
 @router.get("")
 def list_tickets(request: Request) -> dict:
+    _require_auth(request)
     proc_name = settings.tickets_proc
     if not proc_name:
         raise HTTPException(status_code=500, detail="Tickets stored procedure not configured")
@@ -46,6 +53,52 @@ def list_tickets(request: Request) -> dict:
         raise HTTPException(status_code=500, detail="Database error") from exc
 
     return {"items": rows}
+
+
+@router.get("/filtered")
+def get_filtered_tickets(
+    date_from: date,
+    date_to: date,
+    branches: str,
+    draw_schedules: str,
+    request: Request,
+) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_filtered
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Filtered tickets stored procedure not configured")
+
+    table_params = [
+        {
+            "param": "branches",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": [(identifier,) for identifier in _parse_ids(branches, "branches")],
+        },
+        {
+            "param": "draw_schedules",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": [(identifier,) for identifier in _parse_ids(draw_schedules, "draw_schedules")],
+        },
+    ]
+
+    try:
+        result_sets = call_stored_proc_table_vars_multi(
+            proc_name,
+            {"date_from": date_from, "date_to": date_to},
+            table_params,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    return {
+        "items": result_sets[0] if len(result_sets) > 0 else [],
+        "numbers": result_sets[1] if len(result_sets) > 1 else [],
+    }
+
 
 @router.post("")
 def create_ticket(request: Request, payload: dict[str, object]) -> dict:
@@ -66,6 +119,7 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
                 _to_decimal_str(number.get("amount"), "numbers.amount"),
                 number["is_reventado"],
                 number["is_megareventado"],
+                number.get("amount_name")
             )
         )
 
@@ -80,36 +134,41 @@ def create_ticket(request: Request, payload: dict[str, object]) -> dict:
         raise HTTPException(status_code=400, detail="date is required")
     printed_at = datetime.now() + timedelta(hours=settings.HOUR_OFFSET)
 
-    last_error: Exception | None = None
-    # TODO : Implement a more robust mechanism for generating unique serials, possibly using a database sequence or UUIDs.
-    for _ in range(10):
-        params = {
-            "date": date,
-            "draw_schedule_id": payload.get("draw_schedule_id"),
-            "branch_id": payload.get("branch_id"),
-            "details": payload.get("details"),
-            "serial": _generate_serial(),
-            "amount": _to_decimal_str(total_amount, "amount"),
-            "printed_at": printed_at.isoformat(),
-        }
+    params = {
+        "date": date,
+        "draw_schedule_id": payload.get("draw_schedule_id"),
+        "branch_id": payload.get("branch_id"),
+        "details": payload.get("details"),
+        "user_id": payload.get("user_id"),
+        "serial": None,
+        "amount": _to_decimal_str(total_amount, "amount"),
+        "printed_at": printed_at.isoformat(),
+    }
 
-        try:
-            rows = call_stored_proc_table_var(
-                proc_name,
-                params=params,
-                table_param="numbers",
-                table_type="dbo.ticket_detail_list",
-                table_columns=["number", "amount", "is_reventado", "is_megareventado"],
-                table_rows=number_rows,
-            )
-            return {"items": rows}
-        except SQLAlchemyError as exc:
-            if _is_duplicate_serial_error(exc):
-                last_error = exc
-                continue
-            raise HTTPException(status_code=500, detail="Database error") from exc
+    try:
+        rows = call_stored_proc_table_var(
+            proc_name,
+            params=params,
+            table_param="numbers",
+            table_type="dbo.ticket_number_list",
+            table_columns=["number", "amount", "is_reventado", "is_megareventado", "amount_name"],
+            table_rows=number_rows,
+        )
+    except (SQLAlchemyError, ODBCError) as exc:
+        message = str(exc).lower()
+        if "no free random ticket serial found after 256 attempts" in message:
+            raise HTTPException(
+                status_code=503,
+                detail="Unable to allocate a ticket serial. Please try again later.",
+            ) from exc
+        if "unable to acquire the ticket serial lock" in message:
+            raise HTTPException(
+                status_code=503,
+                detail="Ticket creation is temporarily unavailable. Please try again later.",
+            ) from exc
+        raise HTTPException(status_code=500, detail="Database error") from exc
 
-    raise HTTPException(status_code=500, detail="Unable to generate a unique ticket serial") from last_error
+    return {"items": rows}
 
 @router.get("/by-schedule/{draw_schedule_id}/{branch_id}/{date}")
 def get_tickets_by_schedule(request: Request, draw_schedule_id: int, branch_id: int, date: date) -> dict:
@@ -196,3 +255,55 @@ def get_ticket_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     if not results:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return {"items": results}
+
+
+@router.get("/by-serial-banking/{banking_id}/{serial}")
+def get_ticket_by_serial_by_banking(request: Request, banking_id: int, serial: str) -> dict:
+    _require_auth(request)
+    proc_name = settings.ticket_by_serial_banking
+    if not proc_name:
+        raise HTTPException(
+            status_code=500,
+            detail="Tickets by serial and banking stored procedure not configured",
+        )
+
+    try:
+        result_sets = call_stored_proc_multi(
+            proc_name,
+            {"serial": serial, "banking_id": banking_id},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        if "50001" in str(exc) or "does not exist" in str(exc).lower():
+            raise HTTPException(status_code=404, detail="Ticket not found") from exc
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    items = result_sets[0] if len(result_sets) > 0 else []
+    numbers = result_sets[1] if len(result_sets) > 1 else []
+    if not items:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {"items": items, "numbers": numbers}
+
+
+@router.delete("/{branch_id}/{serial}")
+def delete_ticket(request: Request, branch_id: int, serial: str) -> dict:
+    auth_payload = _require_auth(request)
+    proc_name = settings.ticket_delete
+    if not proc_name:
+        raise HTTPException(status_code=500, detail="Delete ticket stored procedure not configured")
+    try:
+        call_stored_proc(
+            proc_name,
+            {
+                "serial": serial,
+                "branch_id": branch_id,
+                "deleted_by": auth_payload["sub"],
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error") from exc
+    return {"message": "Ticket deleted successfully"}
+

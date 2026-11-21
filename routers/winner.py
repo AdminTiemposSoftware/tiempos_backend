@@ -3,7 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import json
 
 from config import settings
-from db import call_stored_proc
+from db import call_stored_proc, call_stored_proc_table_vars
 from routers.auth import _require_auth
 
 router = APIRouter(prefix="/winner", tags=["winner"])
@@ -122,3 +122,69 @@ def get_winner_by_serial(request: Request, branch_id: int, serial: str) -> dict:
     if not results:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return {"items": results}
+
+@router.get("/filtered")
+def get_filtered_winner(date_from: str, date_to: str, branches: str, draw_schedules: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_filtered, "Filtered winner stored procedure not configured")
+    params = {
+        "date_from": date_from,
+        "date_to": date_to
+    }
+    branches_list = [(int(x),) for x in branches.split(",")]
+    draw_schedules_list = [(int(x),) for x in draw_schedules.split(",")]
+    table_params = [
+        {
+            "param": "branches",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": branches_list
+        },
+        {
+            "param": "draw_schedules",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": draw_schedules_list
+        }
+    ]
+    rows = call_stored_proc_table_vars(proc_name, params, table_params)
+    return {"items": rows}
+
+@router.get("/by-schedule/{schedule_id}/{date}")
+def get_winner_ticket_by_schedule(schedule_id: int, date: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_ticket_by_schedule, "Winner ticket by schedule stored procedure not configured")
+    params = {
+        "schedule_id": schedule_id,
+        "date": date
+    }
+    rows = call_stored_proc(proc_name, params)
+    return {"items": rows}
+
+@router.get(f"/ticket/filtered")
+def get_filtered_ticket(date_from: str, date_to: str, draw_schedules: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_ticket_filtered, "Filtered winner ticket stored procedure not configured")
+    params = {
+        "date_from": date_from,
+        "date_to": date_to
+    }
+    draw_schedules_list = [(int(x),) for x in draw_schedules.split(",")]
+    table_params = [
+        {
+            "param": "draw_schedules",
+            "type": "dbo.id_list",
+            "columns": ["id"],
+            "rows": draw_schedules_list
+        }
+    ]
+    rows = call_stored_proc_table_vars(proc_name, params, table_params)
+    return {"items": rows}
+
+
+@router.delete("/{id}")
+def delete_winner(id: int, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(settings.winner_delete, "Delete winner stored procedure not configured")
+    rows = call_stored_proc(proc_name, {"winner_id": id})
+    return {"items": rows}

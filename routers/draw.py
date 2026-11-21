@@ -1,3 +1,4 @@
+from apscheduler.util import date
 from fastapi import APIRouter, Body, HTTPException, Request
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -44,13 +45,13 @@ def create_draw(request: Request, payload: dict[str, object] | None = Body(defau
         settings.draw_create,
         "Draw create stored procedure not configured",
     )
-    params = { 
+    params = {
         "name": payload.get("name"),
         "is_reventado": payload.get("is_reventado"),
         "is_megareventado": payload.get("is_megareventado"),
         "banking_id": payload.get("banking_id")
     }
-    days = payload.get("draw_days") 
+    days = payload.get("draw_days")
     if not isinstance(days, list) or not days:
         raise HTTPException(status_code=400, detail="draw_days must be a non-empty list")
     draw_days = []
@@ -58,10 +59,10 @@ def create_draw(request: Request, payload: dict[str, object] | None = Body(defau
     for day in days:
         day_name = day.get("day_name") if isinstance(day, dict) else day
         draw_days.append((day_name,))
-        
+
     rows = call_stored_proc_table_var(
-        proc_name, 
-        params, 
+        proc_name,
+        params,
         "draw_days",
         "dbo.draw_day_list",
         ["day_name"],
@@ -77,13 +78,13 @@ def update_draw(draw_id: str, request: Request, payload: dict[str, object] | Non
         settings.draw_update,
         "Draw update stored procedure not configured",
     )
-    params = { 
+    params = {
         "id": draw_id,
         "name": payload.get("name"),
         "is_reventado": payload.get("is_reventado"),
         "is_megareventado": payload.get("is_megareventado")
     }
-    days = payload.get("draw_days") 
+    days = payload.get("draw_days")
     if not isinstance(days, list) or not days:
         raise HTTPException(status_code=400, detail="draw_days must be a non-empty list")
     draw_days = []
@@ -91,10 +92,10 @@ def update_draw(draw_id: str, request: Request, payload: dict[str, object] | Non
     for day in days:
         day_name = day.get("day_name") if isinstance(day, dict) else day
         draw_days.append((day_name,))
-        
+
     rows = call_stored_proc_table_var(
-        proc_name, 
-        params, 
+        proc_name,
+        params,
         "draw_days",
         "dbo.draw_day_list",
         ["day_name"],
@@ -150,6 +151,20 @@ def get_draw_schedule_by_branch(branch_id: str, request: Request) -> dict:
     return {"items": rows}
 
 
+@draw_schedule_router.get("/available/by-branch/{branch_id}/{date}")
+def get_draw_schedule_available_by_branch(branch_id: str, date: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.draw_schedule_available_by_branch,
+        "Draw schedule available by branch stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("branch_id", branch_id)
+    params.setdefault("date", date)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
 @draw_schedule_router.get("/names/{banking_id}")
 def get_draw_schedule_names(banking_id: str, request: Request) -> dict:
     proc_name = _get_proc(
@@ -186,9 +201,34 @@ def update_draw_schedule(
         settings.draw_schedule_update,
         "Draw schedule update stored procedure not configured",
     )
+
+    params = {
+        "draw_schedule_id": draw_schedule_id,
+        "name": payload.get("name"),
+        "is_reventado": payload.get("is_reventado"),
+        "is_megareventado": payload.get("is_megareventado"),
+        "time": payload.get("time")
+    }
+
+    days = payload.get("days")
+    if not isinstance(days, list) or not days:
+        raise HTTPException(status_code=400, detail="days must be a non-empty list")
+    draw_days = []
+
+    for day in days:
+        day_name = day.get("day_name") if isinstance(day, dict) else day
+        draw_days.append((day_name,))
+
+    rows = call_stored_proc_table_var(
+        proc_name,
+        params,
+        "draw_days",
+        "dbo.draw_day_list",
+        ["day_name"],
+        draw_days
+    )
     params = _get_payload(request, payload)
     params = {"draw_schedule_id": draw_schedule_id, **params}
-    rows = _call_proc(proc_name, params)
     return {"items": rows}
 
 
@@ -211,6 +251,7 @@ def delete_draw_schedule(
         params.update(dict(request.query_params))
     rows = _call_proc(proc_name, params)
     return {"items": rows}
+
 
 
 @draw_day_router.get("")
@@ -328,6 +369,19 @@ def get_draw_by_branch(branch_id: str, request: Request) -> dict:
     )
     params = dict(request.query_params)
     params.setdefault("branch_id", branch_id)
+    rows = _call_proc(proc_name, params)
+    return {"items": rows}
+
+
+@draw_schedule_branch_router.get("/by-banking/{banking_id}")
+def list_draw_schedule_branch(banking_id: str, request: Request) -> dict:
+    _require_auth(request)
+    proc_name = _get_proc(
+        settings.draw_schedule_branch_by_banking,
+        "Draw schedule branch by banking stored procedure not configured",
+    )
+    params = dict(request.query_params)
+    params.setdefault("banking_id", banking_id)
     rows = _call_proc(proc_name, params)
     return {"items": rows}
 
