@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from routers.auth import _require_auth
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy.exc import SQLAlchemyError
 from pyodbc import Error as ODBCError
 
@@ -57,13 +57,24 @@ def list_tickets(request: Request) -> dict:
 
 @router.get("/filtered")
 def get_filtered_tickets(
-    date_from: date,
-    date_to: date,
     branches: str,
     draw_schedules: str,
     request: Request,
+    selected_date: date | None = Query(None, alias="date"),
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> dict:
     _require_auth(request)
+    # Accept the current UI's equal date bounds during the single-date transition.
+    if selected_date is None:
+        if date_from is None or date_to is None:
+            raise HTTPException(status_code=400, detail="date is required")
+        if date_from != date_to:
+            raise HTTPException(status_code=400, detail="Select a single date; date_from and date_to must match")
+        selected_date = date_from
+    elif any(value is not None and value != selected_date for value in (date_from, date_to)):
+        raise HTTPException(status_code=400, detail="Date parameters must refer to the same day")
+
     proc_name = settings.ticket_filtered
     if not proc_name:
         raise HTTPException(status_code=500, detail="Filtered tickets stored procedure not configured")
@@ -86,7 +97,7 @@ def get_filtered_tickets(
     try:
         result_sets = call_stored_proc_table_vars_multi(
             proc_name,
-            {"date_from": date_from, "date_to": date_to},
+            {"date": selected_date},
             table_params,
         )
     except ValueError as exc:
