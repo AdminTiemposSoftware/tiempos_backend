@@ -3,7 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from routers.auth import _require_auth
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from sqlalchemy.exc import SQLAlchemyError
 from pyodbc import Error as ODBCError
 
@@ -57,11 +57,10 @@ def list_tickets(request: Request) -> dict:
 
 @router.get("/filtered")
 def get_filtered_tickets(
-    date_from: date,
-    date_to: date,
     branches: str,
     draw_schedules: str,
     request: Request,
+    selected_date: date = Query(..., alias="date"),
 ) -> dict:
     _require_auth(request)
     proc_name = settings.ticket_filtered
@@ -86,7 +85,7 @@ def get_filtered_tickets(
     try:
         result_sets = call_stored_proc_table_vars_multi(
             proc_name,
-            {"date_from": date_from, "date_to": date_to},
+            {"date": selected_date},
             table_params,
         )
     except ValueError as exc:
