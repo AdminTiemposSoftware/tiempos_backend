@@ -60,21 +60,9 @@ def get_filtered_tickets(
     branches: str,
     draw_schedules: str,
     request: Request,
-    selected_date: date | None = Query(None, alias="date"),
-    date_from: date | None = None,
-    date_to: date | None = None,
+    selected_date: date = Query(..., alias="date"),
 ) -> dict:
     _require_auth(request)
-    # Accept the current UI's equal date bounds during the single-date transition.
-    if selected_date is None:
-        if date_from is None or date_to is None:
-            raise HTTPException(status_code=400, detail="date is required")
-        if date_from != date_to:
-            raise HTTPException(status_code=400, detail="Select a single date; date_from and date_to must match")
-        selected_date = date_from
-    elif any(value is not None and value != selected_date for value in (date_from, date_to)):
-        raise HTTPException(status_code=400, detail="Date parameters must refer to the same day")
-
     proc_name = settings.ticket_filtered
     if not proc_name:
         raise HTTPException(status_code=500, detail="Filtered tickets stored procedure not configured")
